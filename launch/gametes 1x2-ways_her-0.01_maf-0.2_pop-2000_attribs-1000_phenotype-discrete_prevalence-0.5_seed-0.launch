@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<launchConfiguration type="org.eclipse.jdt.launching.localJavaApplication">
+<listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_PATHS">
+<listEntry value="/gametes-svn/src/org/epistasis/snpgen/ui/SnpGenMainWindow.java"/>
+</listAttribute>
+<listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_TYPES">
+<listEntry value="1"/>
+</listAttribute>
+<listAttribute key="org.eclipse.debug.ui.favoriteGroups">
+<listEntry value="org.eclipse.debug.ui.launchGroup.debug"/>
+<listEntry value="org.eclipse.debug.ui.launchGroup.run"/>
+</listAttribute>
+<stringAttribute key="org.eclipse.jdt.launching.MAIN_TYPE" value="org.epistasis.snpgen.ui.SnpGenMainWindow"/>
+<stringAttribute key="org.eclipse.jdt.launching.PROGRAM_ARGUMENTS" value="--model &quot; --heritability 0.01 -a 0.2 -a 0.2&quot; --dataset &quot;--datasetOutputFile 1x2-ways/her-0.01/maf-0.2/pop-2000/attribs-1000/phenotype-discrete_prevalence-0.5/1x2-ways_her-0.01_maf-0.2_pop-2000_attribs-1000_phenotype-discrete_prevalence-0.5_seed-0 --alleleFrequencyMin 0.01 --alleleFrequencyMax 0.5 --totalCount 2000 --totalAttributeCount 1000 --replicateCount 100 --prevalence 0.5&quot; --rasQuantileCount 1 --rasPopulationCount 1000 --rasTryCount 50000 --randomSeed 0"/>
+<stringAttribute key="org.eclipse.jdt.launching.PROJECT_ATTR" value="gametes-svn"/>
+</launchConfiguration>

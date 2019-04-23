@@ -1,0 +1,33 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
+
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <title>${jnlp.title} ${release.name} (build ${build.num}) ${build.date}</title>
+    </head>
+    <body>
+    <h1>${jnlp.title} ${release.name} (build ${build.num}) ${build.date}</h1>
+    <h3>${jnlp.vendor}</h3>
+    <h4><a href="${jnlp.homepage}">Ryan Urbanowicz, PhD</a></h4>
+<p>
+  ${product.acronym} requires Java 7 or above. You can get the latest version <a href="http://www.java.com/getjava" target="_blank">from Oracle</a>
+</p>
+<p>
+A java executable file is called a 'jar' file and ends with extension '.jar'.<br>
+<h2>You can download the ${product.acronym} jar file to your computer from here: <a href="${jar.name}" download="${jar.name}">${jar.name}</a>.</h2> Once Java is installed, double clicking on a jar file will launch the application.
+</p>
+<p>
+ <a href="GAMETES_v2.1_Users_Guide.pdf">GAMETES_v2.1_Users_Guide.pdf</a>
+</p>
+<p>
+${product.acronym} is most often run with a graphical user interface (GUI).<br>
+It also can be run from the command line and supports a plethora of program parameters.<br>
+See <a href="${gametes.command.line.help.file}" target=""_blank">${gametes.command.line.help.file}</a>.
+</p>
+<p>
+For experienced users with larger analyses, there is a number of python scripts designed for use on a Torque/Moab computer cluster.
+<br>
+For easily generating many folders of varied datasets: <a href="scripts/gametes_batch_on_cluster.py" download="gametes_batch_on_cluster.py">gametes_batch_on_cluster.py</a>
+    </body>
+</html>

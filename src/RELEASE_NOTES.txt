@@ -1,0 +1,13 @@
+Version: @version@ @releaseType@
+Build Date: @buildDate@ build number: @buildNum@
+
+
+You will need to tell Java how much memory to use by using the -Xmx parameter when invoking java.
+You can use 'm' of 'g' for megabytes or gigabytes respectively. Note there is no space between the 'x' and the number.
+
+Example:
+java -Xmx1g -jar MDR.jar
+
+
+----------------------- Change list -----------------------------------------------
+1.0 alpha 2010-04-16

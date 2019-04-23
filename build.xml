@@ -1,0 +1,159 @@
+<project name="gametes" default="cleanAndJar" basedir=".">
+
+	<description>Genetic Architecture Model Emulator for Testing and Evaluation of Software</description>
+
+	<property name="src" location="src" />
+	<property name="build.dir" location="build" />
+	<property name="dist" location="dist" />
+	<property name="res" location="resources" />
+	<property name="scripts" location="scripts" />
+	<property name="lib" location="lib" />
+	<property name="data" location="data" />
+	<property name="doc" location="doc" />
+	<property name="debug" value="true" />
+	<property name="tempZip" value="${dist}/temp.zip" />
+	<property file="${src}/deployment.properties" prefix="global_original" />
+	<property name="project.version" value="${ant.project.name}_${global_original.release.name}" />
+	<property name="jar.name" value="${project.version}.jar" />
+	<property name="dist.jar" value="${dist}/${jar.name}" />
+	<property name="distributionZip" value="${dist}/${ant.project.name}.zip" />
+	<property name="product.acronym" value="GAMETES" />
+	<property name="jnlp.title" value="${product.acronym} Genetic Architecture Model Emulator for Testing and Evaluating Software" />
+	<property name="jnlp.vendor" value="Institute for Biomedical Informatics, Perelman School of Medicine, University of Pennsylvania" />
+	<property name="jnlp.homepage" value="http://www.ryanurbanowicz.com/" />
+	<property name="gametes.command.line.help.file" value="GAMETES_command_line_help.txt" />
+
+	<!-- Set up project.class.path -->
+	<fileset id="external.jars" dir="${lib}" includes="**/*.jar,**/*.zip" />
+	<path id="class.path">
+		<fileset refid="external.jars" />
+	</path>
+
+	<target name="compile" description="compile the source">
+		<mkdir dir="${build.dir}" />
+		<javac srcdir="${src}" destdir="${build.dir}" source="1.7" includeantruntime="false" target="1.7" debug="${debug}" debuglevel="lines,vars,source">
+			<classpath refid="class.path" />
+		</javac>
+	</target>
+
+	<target name="generate_command_line_help" depends="jar">
+		<java classname="org.epistasis.snpgen.ui.SnpGenMainWindow" output="${dist}/${gametes.command.line.help.file}" fork="true">
+			<arg value="--help" />
+			<classpath>
+				<pathelement location="${dist.jar}" />
+			</classpath>
+		</java>
+	</target>
+
+	<target name="jar" depends="compile" description="build an executable jar file">
+		<mkdir dir="${dist}" />
+		<propertyfile file="${src}/deployment.properties" comment="Build version info">
+			<entry key="build.date" type="date" value="now" />
+			<entry key="build.num" default="0" type="int" operation="+" value="1" />
+		</propertyfile>
+		<property file="${src}/deployment.properties" />
+		<copy todir="${build.dir}" overwrite="true" flatten="true">
+			<filterchain>
+				<filterreader classname="org.apache.tools.ant.filters.ExpandProperties" />
+			</filterchain>
+			<resources>
+				<file file="${src}/${ant.project.name}.properties" />
+			</resources>
+		</copy>
+		<copy todir="${dist}" overwrite="true" flatten="true">
+			<filterchain>
+				<filterreader classname="org.apache.tools.ant.filters.ExpandProperties" />
+			</filterchain>
+			<resources>
+				<file file="${src}/RELEASE_NOTES.txt" />
+				<file file="index.html" />
+			</resources>
+			<fileset dir="${res}" />
+		</copy>
+		<copy todir="${dist}" overwrite="true" flatten="true">
+			<resources>
+				<file file="GAMETES_v2.1_Users_Guide.pdf" />
+				<file file="${data}/tables_2_05.txt" />
+			</resources>
+		</copy>
+		<mkdir dir="${dist}/scripts" />
+		<copy todir="${dist}/scripts" overwrite="true" flatten="true">
+			<resources>
+				<file file="${scripts}/gametes_batch_on_cluster.py" />
+			</resources>
+		</copy>
+
+		<delete file="${tempZip}" quiet="true" />
+		<zip destfile="${tempZip}" duplicate="preserve">
+			<fileset dir="${build.dir}" />
+			<fileset dir="${res}" />
+			<zipgroupfileset refid="external.jars" />
+		</zip>
+		<delete file="${dist.jar}" quiet="true" />
+		<jar destfile="${dist.jar}">
+			<manifest>
+				<attribute name="Main-Class" value="org.epistasis.snpgen.ui.SnpGenMainWindow" />
+			</manifest>
+			<zipgroupfileset file="${tempZip}" />
+		</jar>
+		<delete file="${tempZip}" quiet="true" />
+		<property name="keystore.location" value="${build.dir}/uiKeyStore" />
+		<delete file="${keystore.location}" quiet="true" />
+		<property name="key.alias" value="gametes.epistasis.org" />
+		<property name="keystore.password" value="gametesGenPass" />
+		<genkey alias="${key.alias}" keystore="${keystore.location}" storepass="${keystore.password}" validity="3650">
+			<dname>
+				<param name="CN" value="gametes" />
+				<param name="OU" value="Dartmouth Computational Genetics Laboratory" />
+				<param name="O" value="www.epistasis.org" />
+				<param name="C" value="US" />
+			</dname>
+		</genkey>
+		<signjar jar="${dist.jar}" alias="${key.alias}" keystore="${keystore.location}" storepass="${keystore.password}" />
+		<delete file="${distributionZip}" quiet="true" />
+		<zip update="true" basedir="${dist}" destfile="${distributionZip}" filesonly="true">
+			<fileset dir="${basedir}">
+				<include name="COPYING" />
+			</fileset>
+			<exclude name="**/*.zip" />
+		</zip>
+	</target>
+
+	<target name="doc" description="build javadoc files">
+		<mkdir dir="${doc}" />
+		<javadoc destdir="${doc}" sourcepath="${src}" source="1.7" packagenames="org.epistasis.*" private="true">
+			<classpath refid="class.path" />
+		</javadoc>
+	</target>
+
+	<target name="makeWebPage">
+		<loadproperties srcFile="${scripts}/deployment.properties" />
+		<copy todir="${dist}">
+			<filterchain>
+				<filterreader classname="org.apache.tools.ant.filters.ExpandProperties" />
+			</filterchain>
+			<fileset dir="${res}/${webstart.files}" />
+		</copy>
+		<copy todir="${dist}" overwrite="true" flatten="true">
+			<resources>
+				<file file="${res}/images/${jnlp.logo}" />
+			</resources>
+		</copy>
+	</target>
+
+	<target name="cleanAndJar">
+		<antcall target="clean" />
+		<antcall target="jar" />
+		<antcall target="generate_command_line_help" />
+	</target>
+
+	<target name="all" depends="jar,doc" description="build all files" />
+
+	<target name="clean" description="clean up">
+		<delete dir="${dist}" />
+		<delete dir="${build.dir}" />
+		<delete dir="${doc}" />
+		<delete file="${ant.project.name}.jpx.local~" />
+	</target>
+
+</project>
