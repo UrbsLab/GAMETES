@@ -1171,4 +1171,3 @@ public class SnpGenSimulator {
 		public void setValue(int inMax);
 	}
 
-}
