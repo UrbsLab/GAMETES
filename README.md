@@ -94,6 +94,15 @@ Pull requests are welcome. For major changes, please open an issue first to disc
 
 Please make sure to update tests as appropriate.
 
+**Building a .jar file:**
+
+• Import the Gametes zip as an existing archive file into Eclipse (see tips for debugging in Eclipse below)
+
+• Right click on the build.xml file, then run as "ant build"
+
+• Go to your Eclipse Workplace (Finder) -> gametes-svn -> distr: here is the new .jar file, titled gametes_2.2_dev.jar
+
+
 **Some tips and tricks for editing and debugging:**
 
 •	Ensure that you have Java 8 and the latest version of Eclipse
