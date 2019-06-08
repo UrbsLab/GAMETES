@@ -92,6 +92,8 @@ For updating test cases, see the *scripts*.
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. In particular, we welcome changes to update the GUI or changes to improve the code's modularity.
 
+We are especially looking to add GUI functionality for choosing between hierarchical and heterogeneous datasets, as this functionality currently exists only in the command line. 
+
 Please make sure to update tests as appropriate.
 
 **Building a .jar file:**
