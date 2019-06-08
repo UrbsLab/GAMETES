@@ -103,6 +103,7 @@ Please make sure to update tests as appropriate.
 • Go to your Eclipse Workplace (Finder) -> gametes-svn -> distr: here is the new .jar file, titled gametes_2.2_dev.jar
 
 
+
 **Some tips and tricks for editing and debugging:**
 
 •	Ensure that you have Java 8 and the latest version of Eclipse
