@@ -24,14 +24,21 @@ public class SnpGenSimulator {
 	private static final int kMajorMinor = 1;
 	private static final int kMinorMinor = 2;
 	private static final int[] kAlleleSymbols = { SnpGenSimulator.kMajorMajor, SnpGenSimulator.kMajorMinor, SnpGenSimulator.kMinorMinor };
+
 	private static final String kAttributeToken = "Attribute names:";
+
 	private static final String kFrequencyToken = "Minor allele frequencies:";
+
 	private static final String kTableToken = "Table:";
 
 	private final Random random = new Random();
+
 	private PenetranceTableQuantile[] penetranceTableQuantiles;
+
 	private SnpGenDocument document;
+
 	private int tablePopulationCountFound;
+
 
 	public SnpGenSimulator() {
 	}
@@ -68,6 +75,11 @@ public class SnpGenSimulator {
 			quantiles2 = parseModelInputFiles(inputFiles);
 			quantileCount2 = quantiles2.length;
 		}
+
+		// if ((quantiles1 == null) && (quantiles2 == null)) {
+		// throw new
+		// InputException("Must either generate models or get them from a file");
+		// }
 
 		// Combine the penetrance tables from the models and the input files:
 		int quantileCount;
@@ -204,6 +216,21 @@ public class SnpGenSimulator {
 			}
 		}
 
+		// File caseControlFile = null;
+		// caseControlFile = new File(directory, dd.outputFile +
+		// "_caseControlValues.txt");
+		// if(penetranceTableQuantiles != null && caseControlFile != null)
+		// {
+		// boolean append = false;
+		// for(PenetranceTableQuantile q: penetranceTableQuantiles)
+		// {
+		// for(PenetranceTable table: q.tables)
+		// {
+		// table.saveCaseControlValuesToFile(caseControlFile, append);
+		// append = true;
+		// }
+		// }
+		// }
 		if (document.datasetList.size() > 0) {
 			System.out.println("Done generating datasets.");
 		}
@@ -225,6 +252,9 @@ public class SnpGenSimulator {
 		final PenetranceTable.PenetranceTableComparatorEdm edmComparator = new PenetranceTable.PenetranceTableComparatorEdm();
 		final PenetranceTable.PenetranceTableComparatorOddsRatio oddsComparator = new PenetranceTable.PenetranceTableComparatorOddsRatio();
 
+		// double[] heritabilities = new double[inTablesToTryCount];
+		// int totalHeritabilityCount = 0;
+
 		final List<PenetranceTable> penetranceTableList = new ArrayList<PenetranceTable>();
 		PenetranceTable.fixedConflictSuccessfully = 0;
 		PenetranceTable.fixedConflictUnsuccessfully = 0;
@@ -236,11 +266,42 @@ public class SnpGenSimulator {
 			currentPenetranceTable.initialize(inRandom, inAlleleFrequencies);
 			error = currentPenetranceTable.generateUnnormalized(inRandom);
 
+			// if (error == ErrorState.Ambiguous)
+			// {
+			// ++ambiguityCount;
+			// if(currentPenetranceTable.fixedConflict)
+			// ++ambiguousFixedConflictCount;
+			// }
+			// else if (error == ErrorState.Conflict)
+			// {
+			// ++conflictCount;
+			// if(currentPenetranceTable.fixedConflict)
+			// ++conflictedFixedConflictCount;
+			// }
+			// else
+			// {
+			// if(currentPenetranceTable.fixedConflict)
+			// ++successfulFixedConflictCount;
+			// }
+
 			if ((error == PenetranceTable.ErrorState.Ambiguous) || (error == PenetranceTable.ErrorState.Conflict)) {
+				// System.out.println("Failed to construct the penetrance table");
 			} else {
+				// PenetranceTable copy = null;
+				// try
+				// {
+				// copy = (PenetranceTable) currentPenetranceTable.clone();
+				// }
+				// catch(CloneNotSupportedException cnse)
+				// {
+				//
+				// }
+				// currentPenetranceTable.verify();
 				currentPenetranceTable.scaleToUnitInterval();
 				currentPenetranceTable.adjustPrevalence();
+				// currentPenetranceTable.verify();
 				final double herit = currentPenetranceTable.calcHeritability();
+				// heritabilities[totalHeritabilityCount++] = herit;
 				boolean heritabilityAchieved = false;
 				if ((inHeritabilityTolerance < 0)
 						|| (Math.abs((herit - currentPenetranceTable.desiredHeritability) / currentPenetranceTable.desiredHeritability) < inHeritabilityTolerance)) {
@@ -250,9 +311,14 @@ public class SnpGenSimulator {
 				if (!heritabilityAchieved) {
 				} else {
 					currentPenetranceTable.checkRowSums();
+					// if(!currentPenetranceTable.rowSumsValid)
+					// throw new Exception("Table failed the row-sum test!");
 					if (currentPenetranceTable.rowSumsValid) {
 						penetranceTableList.add(currentPenetranceTable);
 					}
+					// if(inProgressHandler != null)
+					// inProgressHandler.setValue(whichModel *
+					// inDesiredTableCount + tableCountSoFar);
 
 					if (penetranceTableList.size() >= inDesiredTableCount) {
 						break;
@@ -270,6 +336,15 @@ public class SnpGenSimulator {
 		} else {
 			Arrays.sort(penetranceTables, edmComparator);
 		}
+
+		// System.out.println("fixedConflictSuccessfully: " +
+		// PenetranceTable.fixedConflictSuccessfully);
+		// System.out.println("fixedConflictUnsuccessfully: " +
+		// PenetranceTable.fixedConflictUnsuccessfully);
+		// heritabilities = Arrays.copyOf(heritabilities,
+		// totalHeritabilityCount);
+		// printStats(heritabilities, 20);
+		// System.out.print("\t");
 
 		return penetranceTables;
 	}
@@ -384,10 +459,13 @@ public class SnpGenSimulator {
 		}
 	}
 
+	// inAllTableScores[eachModel][eachScore]
 	public void writeTablesAndScoresToFile(final ArrayList<DocModel> modelList, final double[][] inAllTableScores, final int quantileCount)
 			throws IOException {
 		final int modelCount = modelList.size();
 
+		// Write scores to the output files, and calculate
+		// tablePopulationCountFoundMinimum:
 		Integer tablePopulationCountFoundMinimum = null;
 		for (int whichModel = 0; whichModel < modelCount; ++whichModel) {
 			final DocModel model = modelList.get(whichModel);
@@ -401,6 +479,8 @@ public class SnpGenSimulator {
 					if ((tablePopulationCountFoundMinimum == null) || (tablePopulationCount < tablePopulationCountFoundMinimum)) {
 						tablePopulationCountFoundMinimum = tablePopulationCount;
 					}
+					// scoreStream.println(scoreName + " scores for model: " +
+					// whichModel);
 					scoreStream.println(scoreName + " scores");
 					for (int i = 0; i < tablePopulationCount; ++i) {
 						scoreStream.println(populationScores[i]);
@@ -411,6 +491,29 @@ public class SnpGenSimulator {
 				final String header = "Selected " + quantileCount + " " + scoreName + " quantiles from a population of "
 						+ tablePopulationCountFoundMinimum + " tables.";
 				writeModelTables(model, tablesFile, header, false);
+				// PrintWriter tableStream = null;
+				// try
+				// {
+				// tableStream = new PrintWriter(new FileWriter(tablesFile,
+				// false));
+				// tableStream.println("Selected " + quantileCount + " " +
+				// scoreName + " quantiles from a population of " +
+				// tablePopulationCountFoundMinimum + " tables.");
+				// }
+				// finally
+				// {
+				// if (tableStream != null)
+				// tableStream.close();
+				// }
+				//
+				// PenetranceTable[] tables = model.getPenetranceTables();
+				// for(int q = 0; q < quantileCount; ++q)
+				// {
+				// if(tables.length > q)
+				// {
+				// tables[q].saveToFile(tablesFile, true, false);
+				// }
+				// }
 			}
 		}
 	}
@@ -651,6 +754,40 @@ public class SnpGenSimulator {
 		}
 	}
 
+	// private void printStats(final Random inRandom, final double herit, final
+	// double inHeritabilityTolerance, final double ras,
+	// final double maf, final int inPopCount, final int inBucketCount, final
+	// int inWhichModel) throws Exception {
+	// int popCount = inPopCount;
+	// double[] scores = new double[popCount];
+	// PenetranceTable[] pop;
+	// pop = generatePenetranceTables(inRandom, popCount, 100 * popCount,
+	// (double) herit, inHeritabilityTolerance, null, 2, new String[] {
+	// "foo", "bar" }, new double[] { (double) maf, (double) maf }, false, null,
+	// 0);
+	// int scoreCount = 0;
+	// for (final PenetranceTable t : pop) {
+	// if (t == null) {
+	// popCount = scoreCount;
+	// break;
+	// }
+	// scores[scoreCount++] = t.edm;
+	// }
+	// if (popCount != inPopCount) {
+	// scores = Arrays.copyOf(scores, popCount);
+	// }
+	// Arrays.sort(scores);
+	// int whichScore = 0;
+	// while ((whichScore < popCount) && (scores[whichScore] < ras)) {
+	// ++whichScore;
+	// }
+	// final double percentile = (100 * (double) whichScore) / popCount;
+	// System.out.print(inWhichModel + "\t" + maf + "\t" + herit + "\t" + ras +
+	// "\t" + percentile + "\t");
+	// SnpGenSimulator.printStats(scores, inBucketCount);
+	// System.out.println();
+	// }
+
 	private void setRandomSeed(final Integer inSeed) {
 		SnpGenSimulator.setRandomSeed(random, inSeed);
 	}
@@ -704,6 +841,8 @@ public class SnpGenSimulator {
 			final PenetranceTable[] inTables, final DocDataset dd, final boolean inReturnDataset,
 			final File inDestFile,
 			final StringBuilder outHeader, final double[] modelFractions) throws Exception {
+		// int caseCount = inCaseCount.getInteger().intValue();
+		// int controlCount = inControlCount.getInteger().intValue();
 
 		int attributeCountPredictiveFromTables = 0;
 		for (final PenetranceTable t : inTables) {
@@ -712,8 +851,15 @@ public class SnpGenSimulator {
 
 		int attributeCountPredictiveFromFile = 0;
 		if (inPredictiveDataset != null) {
-			// Not counting class column
-			attributeCountPredictiveFromFile = inPredictiveDataset[0].length - 1;
+			attributeCountPredictiveFromFile = inPredictiveDataset[0].length - 1; // The
+			// columns
+			// in
+			// inPredictiveDataset,
+			// not
+			// counting
+			// the
+			// class
+			// column
 		}
 
 		final int predictiveAttributeCount = attributeCountPredictiveFromTables + attributeCountPredictiveFromFile;
@@ -729,8 +875,15 @@ public class SnpGenSimulator {
 		final int instanceCount = (inNoiseDataset != null) ? inNoiseDataset.length : dd.totalCount.getInteger().intValue();
 
 		if (inNoiseDataset != null) {
-			totalAttributeCount = predictiveAttributeCount + attributeCountNoiseFile; 
-			// ALERT: we ignore inTotalAttributeCount in this case
+			// If there is a noise dataset then we don't generate any noise
+			// attributes:
+			totalAttributeCount = predictiveAttributeCount + attributeCountNoiseFile; // ALERT:
+			// we
+			// ignore
+			// inTotalAttributeCount
+			// in
+			// this
+			// case
 			attributeCountNoiseGenerated = 0;
 			// and we base caseCount and controlCount on the number of instances
 			// in the noise dataset:
@@ -748,6 +901,8 @@ public class SnpGenSimulator {
 		double penetrance;
 		PenetranceTable.CellId cellId;
 		double sumCaseFractions, sumControlFractions;
+		// caseIntervals[i] == the right edge of the ith probability-interval
+		// for cases; similarly for controls
 		double[][] caseIntervals, controlIntervals;
 		int[][] outputArray = null;
 		if (inReturnDataset) {
@@ -930,6 +1085,10 @@ public class SnpGenSimulator {
 		return outWhich;
 	}
 
+	// public void generateDatasets() throws Exception
+	// {
+	// generateDatasets(progressHandler);
+	// }
 
 	private static void printInstances(final DocDataset dd, final Random inRandom, final int[][] inPredictiveDataset,
 			final int[][] inNoiseDataset,
@@ -945,7 +1104,11 @@ public class SnpGenSimulator {
 
 		int predictiveDatasetAttributeCount = 0;
 		if (inPredictiveDataset != null) {
-			predictiveDatasetAttributeCount = inPredictiveDataset[0].length - 1;
+			predictiveDatasetAttributeCount = inPredictiveDataset[0].length - 1; // Don't
+			// count
+			// the
+			// class
+			// column
 		}
 		int whichPredictive = 0;
 
@@ -1015,6 +1178,16 @@ public class SnpGenSimulator {
 			for (int j = 0; j < inNoiseAttributeCount; ++j) {
 				SnpGenSimulator
 				.noiseToOutput(inRandom, inAlleleFrequencies[j], inOutputStream, inOutputArray, whichOutputLine, destWhich++);
+				// rand = inRandom.nextDouble();
+				// if(rand < inAlleleFrequencyIntervals[0][j])
+				// valueToOutput(kMajorMajor, inOutputStream, true,
+				// inOutputArray, whichOutputLine, destWhich++);
+				// else if(rand < inAlleleFrequencyIntervals[1][j])
+				// valueToOutput(kMajorMinor, inOutputStream, true,
+				// inOutputArray, whichOutputLine, destWhich++);
+				// else
+				// valueToOutput(kMinorMinor, inOutputStream, true,
+				// inOutputArray, whichOutputLine, destWhich++);
 			}
 
 			if (inPredictiveDataset != null) {
@@ -1035,6 +1208,22 @@ public class SnpGenSimulator {
 				++whichPredictive;
 			}
 
+			// We're going to put the current instance (either a case or a
+			// control, as determined by this method's caller; let's say it's a
+			// case)
+			// into some cell of each specified table.
+			// Let's say there are three tables.
+			// Then we're going to put the current case into some cell of the
+			// first table,
+			// and, simultaneously, into some cell of the second table, and some
+			// cell of the third table.
+			// Equivalently, we're going to put the case into some cell of the
+			// cross-product of the three tables:
+			// if the first table is 2-D, the second table is 4-D, and the third
+			// table is 3-D,
+			// then we are choosing a cell in the 9-D table which is the
+			// cross-product of the three given tables.
+			// (Added later: I'm not sure what the above comment is in aid of.)
 
 			// As we iterate through the outer loop, we need to fill in each
 			// table's cellCaseCount or cellControlCount, as determined by
@@ -1106,7 +1295,11 @@ public class SnpGenSimulator {
 							final double weightedContinuousEndpoint = continuousEndpoint * modelFractions[whichTable];
 							phenotypeValue += weightedContinuousEndpoint;
 						}
-
+						// System.err.println("row-" + row + " whichCell-" +
+						// whichCell + " penetranceForCell-" + penetranceForCell
+						// + " scaledOntoRangePenetrance-" +
+						// scaledOntoRangePenetrance + " continuousEndpoint-" +
+						// continuousEndpoint);
 					} else {
 						// if not continuous data use 0 or 1
 						phenotypeValue = inInstanceClass;
@@ -1136,8 +1329,144 @@ public class SnpGenSimulator {
 			++whichOutputLine;
 		}
 
+		// // Output for testing:
+		// if(inInstanceClass == 0)
+		// {
+		// NumberFormat nf = NumberFormat.getInstance();
+		// nf.setMaximumFractionDigits(4);
+		// for(int whichTable = 0; whichTable < inTables.length; ++whichTable)
+		// {
+		// PenetranceTable table = inTables[whichTable];
+		// System.out.println("Table " + whichTable + ", penetrances");
+		// for(int j = 0; j < 3; ++j)
+		// {
+		// for(int k = 0; k < 3; ++k)
+		// {
+		// System.out.print(nf.format(table.cells[3 * j + k].getValue()) +
+		// "\t");
+		// }
+		// System.out.println();
+		// }
+		// System.out.println();
+		// System.out.println("Table " + whichTable + ", allele frequencies");
+		// double[] alleleFrequencies0 = new double[3];
+		// double[] alleleFrequencies1 = new double[3];
+		// table.getAlleleFrequencies(0, alleleFrequencies0);
+		// table.getAlleleFrequencies(1, alleleFrequencies1);
+		// for(int j = 0; j < 3; ++j)
+		// {
+		// for(int k = 0; k < 3; ++k)
+		// {
+		// System.out.print(nf.format(alleleFrequencies0[j] *
+		// alleleFrequencies1[k]) + "\t");
+		// }
+		// System.out.println();
+		// }
+		// System.out.println();
+		// System.out.println("Table " + whichTable + ", case-counts");
+		// for(int j = 0; j < 3; ++j)
+		// {
+		// for(int k = 0; k < 3; ++k)
+		// {
+		// System.out.print(table.cellCaseCount[3 * j + k] + "\t");
+		// }
+		// System.out.println();
+		// }
+		// System.out.println();
+		// System.out.println("Table " + whichTable + ", control-counts");
+		// for(int j = 0; j < 3; ++j)
+		// {
+		// for(int k = 0; k < 3; ++k)
+		// {
+		// System.out.print(table.cellControlCount[3 * j + k] + "\t");
+		// }
+		// System.out.println();
+		// }
+		// System.out.println();
+		// System.out.println();
+		// }
+		// }
 	}
 
+	// public void calcStatsForStdModels(SnpGenDocument inDoc) throws Exception
+	// {
+	// if(inDoc.inputFile != null)
+	// {
+	// Random random = createRandom(inDoc.randomSeed);
+	// int popCount = 1000;
+	// int bucketCount = 100;
+	//
+	// printStats(random, 0.02, 0.05F, 0.01, 0.2, popCount, bucketCount, -1);
+	// printStats(random, 0.02, 0.05F, 0.01, 0.2, popCount, bucketCount, -1);
+	// printStats(random, 0.02, 0.05F, 0.01, 0.2, popCount, bucketCount, -1);
+	// printStats(random, 0.02, -1, 0.01, 0.2, popCount, bucketCount, -1);
+	// printStats(random, 0.02, -1, 0.01, 0.2, popCount, bucketCount, -1);
+	// printStats(random, 0.02, -1, 0.01, 0.2, popCount, bucketCount, -1);
+	//
+	// printStats(random, 0.1, 0.05F, 0.01, 0.4, popCount, bucketCount, -1);
+	// printStats(random, 0.1, 0.05F, 0.01, 0.4, popCount, bucketCount, -1);
+	// printStats(random, 0.1, 0.05F, 0.01, 0.4, popCount, bucketCount, -1);
+	// printStats(random, 0.1, -1, 0.01, 0.4, popCount, bucketCount, -1);
+	// printStats(random, 0.1, -1, 0.01, 0.4, popCount, bucketCount, -1);
+	// printStats(random, 0.1, -1, 0.01, 0.4, popCount, bucketCount, -1);
+	//
+	// PenetranceTable[] tables = parseStandardTables(inDoc.inputFile);
+	// int whichModel = 0;
+	// System.out.println("Model #\tMAF\tHeritability\tRAS\tRAS percentile\tMinimum RAS\tMaximum RAS\tMean RAS\tStd Dev RAS\tBucket-counts");
+	// for(PenetranceTable t: tables)
+	// {
+	// // Generate the distribution twice, to see whether there's any
+	// significant variation:
+	// printStats(random, t, popCount, bucketCount, whichModel);
+	// printStats(random, t, popCount, bucketCount, whichModel);
+	// ++whichModel;
+	// }
+	// }
+	// }
+
+	// private static void printStats(final double[] scores, final int
+	// inBucketCount) {
+	// final NumberFormat f = NumberFormat.getInstance();
+	// f.setMaximumFractionDigits(2);
+	// Arrays.sort(scores);
+	// final int scoreCount = scores.length;
+	// double sum = 0;
+	// double sumOfSquares = 0;
+	// for (final double d : scores) {
+	// sum += d;
+	// sumOfSquares += d * d;
+	// }
+	// final double mean = sum / scoreCount;
+	// System.out.print("\t" + scoreCount + "\t" + scores[0] + "\t" +
+	// scores[scoreCount - 1] + "\t" + mean + "\t"
+	// + Math.sqrt((sumOfSquares / scoreCount) - (mean * mean)));
+	// int whichScore = 0;
+	// final double bucketWidth = (scores[scoreCount - 1] - scores[0]) /
+	// inBucketCount;
+	// int bucketCount;
+	// int bucketCountSoFar = 0;
+	// double bucketRight;
+	// // System.out.println("\t" + scores[0] + "\t" + scores[inPopCount - 1]);
+	// for (int i = 1; i < inBucketCount; ++i) // Don't count the last bucket,
+	// // assume it's whatever's left
+	// // at the end
+	// {
+	// bucketRight = scores[0] + (i * bucketWidth);
+	// bucketCount = 0;
+	// while (scores[whichScore] <= bucketRight) {
+	// ++bucketCount;
+	// ++whichScore;
+	// }
+	// // Now, whichScore is the first score past the current bucket
+	// bucketCountSoFar += bucketCount;
+	// System.out.print("\t" + f.format((100 * (double) bucketCount) /
+	// scoreCount));
+	// }
+	// bucketCount = scoreCount - bucketCountSoFar;
+	// System.out.print("\t" + f.format((100 * (double) bucketCount) /
+	// scoreCount));
+	// }
+	//
 	private static void setRandomSeed(final Random inRandom, final Integer inSeed) {
 		if (inSeed != null) {
 			inRandom.setSeed(inSeed);
@@ -1171,3 +1500,8 @@ public class SnpGenSimulator {
 		public void setValue(int inMax);
 	}
 
+	// private static class PenetranceTablePopulation {
+	// public int currentTableCount;
+	// public PenetranceTable[] tables;
+	// }
+}
