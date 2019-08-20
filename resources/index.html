@@ -1,0 +1,46 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
+
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <title>${jnlp.title} ${release.name} (build ${build.num}) ${build.date}</title>
+    </head>
+    <body>
+		<img src="${jnlp.logo}"/>
+    <h1>${jnlp.title} ${release.name} (build ${build.num}) ${build.date}</h1>
+    <h3>${jnlp.vendor}</h3>
+    <h4>Principal Investigator: <a href="${jnlp.homepage}">Jason H. Moore, PhD</a></h4>
+<p>
+  MDR requires Java 7 or above. You can get the latest version <a href="http://www.java.com/getjava" target="_blank">from Oracle</a>
+</p>
+<p>
+A java executable file is called a 'jar' file and ends with extension '.jar'.<br>
+<h2>You can download the MDR jar file to your computer from here: <a href="${jar.name}" download="${jar.name}">${jar.name}</a>.</h2> Once Java is installed, double clicking on a jar file will launch the application.
+</p>
+<p>
+ <a href="RELEASE_NOTES.txt">Release notes</a>
+</p>
+<p>
+<h3>Sample data files:</h3>
+<h4><a href="MDR-SampleData.txt" download="MDR-SampleData.txt">MDR-SampleData.txt</a></h4>
+<h4><a href="MDR-SampleData-continuous-endpoints.txt" download="MDR-SampleData-continuous-endpoints.txt">MDR-SampleData-continuous-endpoints.txt</a></h4>
+</p>
+<p>
+MDR is most often run with a graphical user interface (GUI).<br>
+It also can be run from the command line and supports a plethora of program parameters.<br>
+See <a href="${mdr.command.line.help.file}" target=""_blank">${mdr.command.line.help.file}</a>.
+</p>
+<p>
+For experienced users with larger analyses, there are a number of python scripts designed for use on a Torgue/Moab computer cluster.
+These scripts will create and submit jobs to the cluster. Once the jobs are complete, the user must re-run the script with the identical parameters and the results of the cluster jobs will be collated.
+<br>
+For splitting an analysis across multiple computers: <a href="scripts/large_file_on_cluster.py" download="large_file_on_cluster.py">large_file_on_cluster.py</a>
+<br>
+For splitting permutations across multiple computers: <a href="scripts/permutations_on_cluster.py" download="permutations_on_cluster.py">permutations_on_cluster.py</a>
+</p>
+<p>
+A new feature in the development version of MDR is permutation testing in the GUI. See <a href="${permutation.testing.html}" target="_blank">${permutation.testing.html}</a>.
+</p>
+    </body>
+</html>

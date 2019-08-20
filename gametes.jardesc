@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="MacRoman" standalone="no"?>
+<jardesc>
+    <jar path="snpgen_cgl/gametes.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/snpgen_cgl/gametes.jardesc" exportErrors="false" exportWarnings="true" includeDirectoryEntries="false" overwrite="false" saveDescription="true" storeRefactorings="false" useSourceFolders="false"/>
+    <storedRefactorings deprecationInfo="true" structuralOnly="false"/>
+    <selectedProjects/>
+    <manifest generateManifest="true" mainClassHandleIdentifier="=snpgen_cgl/src&lt;org.epistasis.snpgen.ui{SnpGenMainWindow.java[SnpGenMainWindow" manifestLocation="" manifestVersion="1.0" reuseManifest="false" saveManifest="false" usesManifest="true">
+        <sealing sealJar="false">
+            <packagesToSeal/>
+            <packagesToUnSeal/>
+        </sealing>
+    </manifest>
+    <selectedElements exportClassFiles="true" exportJavaFiles="false" exportOutputFolder="false">
+        <javaElement handleIdentifier="=snpgen_cgl/src"/>
+    </selectedElements>
+</jardesc>

@@ -31,7 +31,7 @@
 
 	<target name="compile" description="compile the source">
 		<mkdir dir="${build.dir}" />
-		<javac srcdir="${src}" destdir="${build.dir}" source="1.7" includeantruntime="false" target="1.7" debug="${debug}" debuglevel="lines,vars,source">
+		<javac srcdir="${src}" destdir="${build.dir}" source="1.8" includeantruntime="false" target="1.8" debug="${debug}" debuglevel="lines,vars,source">
 			<classpath refid="class.path" />
 		</javac>
 	</target>
