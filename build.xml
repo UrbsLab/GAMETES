@@ -70,12 +70,6 @@
 			</resources>
 			<fileset dir="${res}" />
 		</copy>
-		<copy todir="${dist}" overwrite="true" flatten="true">
-			<resources>
-				<file file="GAMETES_v2.1_Users_Guide.pdf" />
-				<file file="${data}/tables_2_05.txt" />
-			</resources>
-		</copy>
 		<mkdir dir="${dist}/scripts" />
 		<copy todir="${dist}/scripts" overwrite="true" flatten="true">
 			<resources>
