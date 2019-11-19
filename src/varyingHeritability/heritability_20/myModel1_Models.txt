@@ -1,0 +1,16 @@
+Selected 1 EDM quantiles from a population of 1000 tables.
+
+
+
+
+Attribute names:	P0
+Minor allele frequencies:	0.2
+K: 0.39829559487222155
+Heritability: 0.2
+Ease-of-detection metric: 0.14009019579460424
+Odds ratio: 11.43200087367964
+Table has passed the row-sum test.
+
+Table:
+
+0.5218403897619406,  0.09368398119898852,  0.8584717860225803

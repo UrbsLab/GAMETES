@@ -4,30 +4,43 @@
 <html>
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-        <title>GAMETES Genetic Architecture Model Emulator for Testing and Evaluating Software 2.2_dev (build 162) 2019/06/07 10:35</title>
+        <title>GAMETES Genetic Architecture Model Emulator for Testing and Evaluating Software 2.2_dev (build 163) 2019/11/19 10:46</title>
     </head>
     <body>
-    <h1>GAMETES Genetic Architecture Model Emulator for Testing and Evaluating Software 2.2_dev (build 162) 2019/06/07 10:35</h1>
+		<img src="${jnlp.logo}"/>
+    <h1>GAMETES Genetic Architecture Model Emulator for Testing and Evaluating Software 2.2_dev (build 163) 2019/11/19 10:46</h1>
     <h3>Institute for Biomedical Informatics, Perelman School of Medicine, University of Pennsylvania</h3>
-    <h4><a href="http://www.ryanurbanowicz.com/">Ryan Urbanowicz, PhD</a></h4>
+    <h4>Principal Investigator: <a href="http://www.ryanurbanowicz.com/">Jason H. Moore, PhD</a></h4>
 <p>
-  GAMETES requires Java 7 or above. You can get the latest version <a href="http://www.java.com/getjava" target="_blank">from Oracle</a>
+  MDR requires Java 7 or above. You can get the latest version <a href="http://www.java.com/getjava" target="_blank">from Oracle</a>
 </p>
 <p>
 A java executable file is called a 'jar' file and ends with extension '.jar'.<br>
-<h2>You can download the GAMETES jar file to your computer from here: <a href="gametes_2.2_dev.jar" download="gametes_2.2_dev.jar">gametes_2.2_dev.jar</a>.</h2> Once Java is installed, double clicking on a jar file will launch the application.
+<h2>You can download the MDR jar file to your computer from here: <a href="gametes_2.2_dev.jar" download="gametes_2.2_dev.jar">gametes_2.2_dev.jar</a>.</h2> Once Java is installed, double clicking on a jar file will launch the application.
 </p>
 <p>
- <a href="GAMETES_v2.1_Users_Guide.pdf">GAMETES_v2.1_Users_Guide.pdf</a>
+ <a href="RELEASE_NOTES.txt">Release notes</a>
 </p>
 <p>
-GAMETES is most often run with a graphical user interface (GUI).<br>
+<h3>Sample data files:</h3>
+<h4><a href="MDR-SampleData.txt" download="MDR-SampleData.txt">MDR-SampleData.txt</a></h4>
+<h4><a href="MDR-SampleData-continuous-endpoints.txt" download="MDR-SampleData-continuous-endpoints.txt">MDR-SampleData-continuous-endpoints.txt</a></h4>
+</p>
+<p>
+MDR is most often run with a graphical user interface (GUI).<br>
 It also can be run from the command line and supports a plethora of program parameters.<br>
-See <a href="GAMETES_command_line_help.txt" target=""_blank">GAMETES_command_line_help.txt</a>.
+See <a href="${mdr.command.line.help.file}" target=""_blank">${mdr.command.line.help.file}</a>.
 </p>
 <p>
-For experienced users with larger analyses, there is a number of python scripts designed for use on a Torque/Moab computer cluster.
+For experienced users with larger analyses, there are a number of python scripts designed for use on a Torgue/Moab computer cluster.
+These scripts will create and submit jobs to the cluster. Once the jobs are complete, the user must re-run the script with the identical parameters and the results of the cluster jobs will be collated.
 <br>
-For easily generating many folders of varied datasets: <a href="scripts/gametes_batch_on_cluster.py" download="gametes_batch_on_cluster.py">gametes_batch_on_cluster.py</a>
+For splitting an analysis across multiple computers: <a href="scripts/large_file_on_cluster.py" download="large_file_on_cluster.py">large_file_on_cluster.py</a>
+<br>
+For splitting permutations across multiple computers: <a href="scripts/permutations_on_cluster.py" download="permutations_on_cluster.py">permutations_on_cluster.py</a>
+</p>
+<p>
+A new feature in the development version of MDR is permutation testing in the GUI. See <a href="${permutation.testing.html}" target="_blank">${permutation.testing.html}</a>.
+</p>
     </body>
 </html>

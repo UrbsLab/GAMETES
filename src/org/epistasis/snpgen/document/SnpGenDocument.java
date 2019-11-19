@@ -32,7 +32,9 @@ public class SnpGenDocument {
 	public static final DecimalFormat kDecimalFormatFourDecimals = new DecimalFormat("#.####");
 	public static final DecimalFormat kDecimalFormatTenDecimals = new DecimalFormat("#.##########");
 	private static final String kDefaultAttributeNameBase = "P";
-	private static final MIXED_MODEL_DATASET_TYPE kDefaultMultipleModelDatasetType = MIXED_MODEL_DATASET_TYPE.heterogeneous;
+	//private static final MIXED_MODEL_DATASET_TYPE kDefaultMultipleModelDatasetType = MIXED_MODEL_DATASET_TYPE.heterogeneous;
+	private static final MIXED_MODEL_DATASET_TYPE kDefaultMultipleModelDatasetType = MIXED_MODEL_DATASET_TYPE.hierarchical;
+
 
 	private int nextModelNumber;
 	private final ArrayList<DocListener> listeners;
@@ -700,7 +702,6 @@ public class SnpGenDocument {
 	}
 
 	public static class DocDataset {
-		public DocMIXED_MODEL_DATASET_TYPE multipleModelDatasetType;
 		public DocDouble alleleFrequencyMin;
 		public DocDouble alleleFrequencyMax;
 		public DocInteger totalAttributeCount;
@@ -711,6 +712,7 @@ public class SnpGenDocument {
 		public DocBoolean createContinuousEndpoints;
 		public DocDouble continuousEndpointsStandardDeviation;
 		public DocInteger totalCount;
+		public DocMIXED_MODEL_DATASET_TYPE multipleModelDatasetType;
 
 		public DocDataset(final SnpGenDocument inDoc) {
 			alleleFrequencyMin = new DocDouble(SnpGenDocument.kDefaultFrequencyMin);

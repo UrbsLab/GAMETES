@@ -52,6 +52,7 @@ import org.epistasis.snpgen.document.SnpGenDocument.DocInteger;
 import org.epistasis.snpgen.document.SnpGenDocument.DocMember;
 import org.epistasis.snpgen.document.SnpGenDocument.DocModel;
 import org.epistasis.snpgen.document.SnpGenDocument.DocString;
+import org.epistasis.snpgen.document.SnpGenDocument.MIXED_MODEL_DATASET_TYPE;
 import org.epistasis.snpgen.exception.InputException;
 import org.epistasis.snpgen.exception.ProcessingException;
 import org.epistasis.snpgen.simulator.PenetranceTable;
@@ -751,6 +752,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
     private void viewDataFile() {
     }
 
+    
     public static void main(final String[] args) {
 
         final SnpGenDocument doc = new SnpGenDocument(false);
@@ -762,15 +764,18 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             System.err.println(e.getMessage());
             e.printStackTrace();
         }
-
+        
         final boolean runDocument = doc.runDocument;
-
+        System.out.println("doc is " + doc);
+        
         if (showGui) {
+            System.out.println("Going into GUI!");
             doc.createFirstDataset();
             SnpGenMainWindow.createAndShowGui(doc);
         }
 
         if (runDocument) {
+            doc.createFirstDataset();
             SnpGenMainWindow.runDocument(doc);
         }
     }
@@ -830,10 +835,9 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
      * @wbp.parser.entryPoint
      */
     private static void createAndShowGui(final SnpGenDocument inSnpGenDocument) {
-        final SnpGenMainWindow snpGen = new SnpGenMainWindow(inSnpGenDocument);
-
-        // Schedule a job for the event-dispatching thread: creating and showing
-        // this application's GUI.
+        final SnpGenMainWindow snpGen = new SnpGenMainWindow(inSnpGenDocument);   
+        
+        // Schedule a job for the event-dispatching thread: creating and showing this application's GUI.
         javax.swing.SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
@@ -853,11 +857,17 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             simulator.setDocument(inDocument);
             final int desiredQuantileCount = inDocument.rasQuantileCount.getInteger();
             final ArrayList<DocModel> modelList = inDocument.modelList;
+            
+            // Generate models based upon the model list and the quantile count
             final double[][] allTableScores = simulator.generateTablesForModels(modelList, desiredQuantileCount,
                     inDocument.rasPopulationCount.getInteger(), inDocument.rasTryCount.getInteger(), null);
+            
             simulator.writeTablesAndScoresToFile(modelList, allTableScores, desiredQuantileCount);
+            
             simulator.combineModelTablesIntoQuantiles(modelList, inDocument.modelInputFiles);
+            
             simulator.generateDatasets(null);
+            
         } catch (final Exception ex) {
             System.err.println(ex.getMessage());
             ex.printStackTrace();
@@ -1001,6 +1011,8 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
     }
 
+    // Define the overall Dataset Construction Panel, with non-predictive attributes, dataset properties, and
+    //    replicate count panel info
     public class DatasetPanel extends JPanel {
 
         private static final long serialVersionUID = 1L;
@@ -1008,18 +1020,17 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         public DatasetPanel() {
             setBorder(BorderFactory.createTitledBorder("Dataset Construction"));
             setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+            
             add(new NonPredictiveAttributesPanel());
 
-            endpointTypePanel = new EndpointTypePanel();
-            add(endpointTypePanel);
+            add(new EndpointTypePanel());
 
             datasetControlPanel = new DatasetReplicateCountPanel();
-            datasetControlPanel.setBorder(BorderFactory.createLineBorder(Color.gray));
             add(datasetControlPanel, BorderLayout.CENTER);
-
         }
-    } // end class DatasetPanel
+    }
 
+    // Define the bottom dataset replication count panel
     public class DatasetReplicateCountPanel extends JPanel implements FocusListener {
         private static final long serialVersionUID = 1L;
         BackedTextField replicateCountField;
@@ -1051,23 +1062,17 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             setLayout(new BoxLayout(this, BoxLayout.X_AXIS));
 
             replicateCountField = addBackedInteger(this, getDocument().firstDataset.replicateCount, 3,
-                    "Number of replicates"); // The
-            // number
-            // of
-            // random
-            // seeds
+                    "Number of replicates"); // The number of random seeds
             replicateCountField.setText(SnpGenDocument.kDefaultReplicateCount.toString());
             replicateCountField.addFocusListener(this);
 
-            datasetCountField = (JLabel) addComponent(JLabel.class, this, null, 0, "Total number of datasets:"); // The
-            // total
-            // number
-            // of
-            // datasets
+            // The total number of datasets
+            datasetCountField = (JLabel) addComponent(JLabel.class, this, null, 0, "Total number of datasets:");
             updateDatasetCountField();
         }
     }
 
+    
     public static class EditModelAction extends SnpGenAction {
         private static final long serialVersionUID = 1L;
 
@@ -1087,88 +1092,130 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
     }
 
-    // START HERE
+    // Dataset Properties Panel
     public class EndpointTypePanel extends JPanel {
         private static final long serialVersionUID = 1L;
+        
+        JRadioButton binaryClassButton;
+        JRadioButton quantitativeTraitButton;
+        
+        // Initialize the panels corresponding to binary and quantitative data
         final CardLayout binaryCardLayout = new CardLayout();
         final JPanel binaryCards = new JPanel(binaryCardLayout);
-        FixedSampleNumberCaseControlPanel fixedSampleNumberCaseControlPanel = null;
-        CaseControlPanel caseControlPanel = null;
-        QuantitativePanel quantitativePanel = null;
+        FixedSampleNumberCaseControlPanel fixedSampleNumberCaseControlPanel;
+        CaseControlPanel caseControlPanel;
+        QuantitativePanel quantitativePanel;
 
-        EndpointTypePanel() {
-            setBorder(BorderFactory.createLineBorder(Color.lightGray));
-
+        public EndpointTypePanel() {
+            // Define our border and its layout, corresponding to the dataset properties
+            setBorder(BorderFactory.createTitledBorder("Dataset Properties"));
             setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-            final JPanel dataChoices = new JPanel();
-            final JPanel buttonChoices = new JPanel();
+            
+            // Define panel corresponding to choices for binary trait vs quantitative traits
+            JPanel endPointButtonChoicesPanel;
+            endPointButtonChoicesPanel = new JPanel();
+
+            // Define panel corresponding to choices for additive data vs heterogeneous data
+            JPanel comboDataButtonChoicesPanel;
+            comboDataButtonChoicesPanel = new JPanel();
+
+            // Create the binary class/quantitative trait buttons
+            binaryClassButton = new JRadioButton("Binary Class");
+            quantitativeTraitButton = new JRadioButton("Quantitative Trait");
+            binaryClassButton.setSelected(true);
+            binaryClassButton.setEnabled(true);
+            quantitativeTraitButton.setEnabled(true);
+            
+            // Create the additive and hetero data radio buttons
             additiveButton = new JRadioButton("Additive Data");
             heteroButton = new JRadioButton("Heterogenous Data");
+            //additiveButton.setSelected(true);
             additiveButton.setSelected(true);
             additiveButton.setEnabled(false);
             heteroButton.setEnabled(false);
-            dataChoices.add(additiveButton, BorderLayout.WEST);
-            dataChoices.add(heteroButton, BorderLayout.EAST);
-            final JRadioButton binaryClassButton = new JRadioButton("Binary Class");
-            final JRadioButton quantitativeTraitButton = new JRadioButton("Quantitative Trait");
-            buttonChoices.add(binaryClassButton, BorderLayout.WEST);
-            buttonChoices.add(quantitativeTraitButton, BorderLayout.EAST);
-
-            final ButtonGroup group = new ButtonGroup();
-            final ButtonGroup dataGroup = new ButtonGroup();
-            group.add(binaryClassButton);
-            group.add(quantitativeTraitButton);
-            dataGroup.add(additiveButton);
-            dataGroup.add(heteroButton);
-            binaryClassButton.setSelected(true);
-            add(dataChoices, BorderLayout.CENTER);
-            add(buttonChoices, BorderLayout.CENTER);
-
+            
+            // Group the endPoint radio buttons
+            final ButtonGroup endPointGroup = new ButtonGroup();
+            endPointGroup.add(binaryClassButton);
+            endPointGroup.add(quantitativeTraitButton);
+            
+            // Group the comboData radio buttons
+            final ButtonGroup comboDataGroup = new ButtonGroup();
+            comboDataGroup.add(additiveButton);
+            comboDataGroup.add(heteroButton);
+            
+            // Add our buttons to our panels and add our panels to the layout
+            endPointButtonChoicesPanel.add(binaryClassButton, BorderLayout.WEST);
+            endPointButtonChoicesPanel.add(quantitativeTraitButton, BorderLayout.EAST);
+            comboDataButtonChoicesPanel.add(additiveButton, BorderLayout.WEST);
+            comboDataButtonChoicesPanel.add(heteroButton, BorderLayout.EAST);
+            add(comboDataButtonChoicesPanel, BorderLayout.CENTER);
+            add(endPointButtonChoicesPanel, BorderLayout.CENTER);
+            
+            // Define an endpointCardLayout, as well as a JPanel for it
             final CardLayout endpointCardLayout = new CardLayout();
             final JPanel endpointTypeCards = new JPanel(endpointCardLayout);
 
+            // Define the panel that corresponds to allowing users to specify both cases and controls
             caseControlPanel = new CaseControlPanel();
             binaryCards.add(caseControlPanel, SnpGenMainWindow.FIXED_OR_VARIABLE_NUMBER_OF_SAMPLES.VARIABLE.toString());
+            
+            // Define the panel that corresponds to fixed control given x number of cases
             fixedSampleNumberCaseControlPanel = new FixedSampleNumberCaseControlPanel();
-            binaryCards.add(fixedSampleNumberCaseControlPanel,
-                    SnpGenMainWindow.FIXED_OR_VARIABLE_NUMBER_OF_SAMPLES.FIXED.toString());
+            binaryCards.add(fixedSampleNumberCaseControlPanel, SnpGenMainWindow.FIXED_OR_VARIABLE_NUMBER_OF_SAMPLES.FIXED.toString());
+           
             setFixedOrVariableNumberOfSamples(SnpGenMainWindow.FIXED_OR_VARIABLE_NUMBER_OF_SAMPLES.VARIABLE);
-
             endpointTypeCards.add(binaryCards, SnpGenMainWindow.ENDPOINT_TYPES.BINARY_CLASS.toString());
 
+            // Define the panel that allows users to just do a quantitative trait, w sample number and std dev
             quantitativePanel = new QuantitativePanel();
             endpointTypeCards.add(quantitativePanel, SnpGenMainWindow.ENDPOINT_TYPES.QUANTITATIVE_TRAIT.toString());
             add(endpointTypeCards, BorderLayout.SOUTH);
 
+            
+            // Register listeners for the radio buttons          
+            // Include an ActionListener to report the output from the binaryClass button
             binaryClassButton.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(final ActionEvent e) {
+                    // If the binary class button is picked, show the relevant values and update the GUI based upon the
+                    //    current data
+                    System.out.println("Based upon the UI, we doing binary");
                     endpointCardLayout.show(endpointTypeCards, SnpGenMainWindow.ENDPOINT_TYPES.BINARY_CLASS.toString());
                     getDocument().firstDataset.createContinuousEndpoints.setValue(Boolean.FALSE);
                     fixedSampleNumberCaseControlPanel.updateGuiToData();
                 }
             });
 
+            // Include an ActionListener to report the output from the quantitativeTrait button
             quantitativeTraitButton.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(final ActionEvent e) {
-                    endpointCardLayout.show(endpointTypeCards,
-                            SnpGenMainWindow.ENDPOINT_TYPES.QUANTITATIVE_TRAIT.toString());
+                    // If the quantitative trait button is picked, show the relevant values and update the GUI based upon
+                    //    the current data
+                    endpointCardLayout.show(endpointTypeCards, SnpGenMainWindow.ENDPOINT_TYPES.QUANTITATIVE_TRAIT.toString());
                     getDocument().firstDataset.createContinuousEndpoints.setValue(Boolean.TRUE);
                     quantitativePanel.updateGuiToData();
                 }
             });
+            
+            // Include an ActionListener to update the document given the heteroButton button
+            heteroButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(final ActionEvent e) {
+                    System.out.println("Based upon the UI, multipleModelType should be heterogeneous");
+                    getDocument().firstDataset.multipleModelDatasetType.setValue(MIXED_MODEL_DATASET_TYPE.heterogeneous);
+                }
+            });
 
-            /*
-             * additiveButton.addActionListener(new ActionListener() {
-             * 
-             * @Override public void actionPerformed(final ActionEvent e) {
-             * dataCardLayout.show(dataTypeCards,
-             * SnpGenMainWindow.DATA_TYPES.ADDITIVE.toString());
-             * getDocument().firstDataset.createContinuousEndpoints.setValue(Boolean.FALSE);
-             * fixedSampleNumberCaseControlPanel.updateGuiToData(); } });
-             */
-
+            // Include an ActionListener to update the document given the additiveButton button
+            additiveButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(final ActionEvent e) {
+                    System.out.println("Based upon the UI, multipleModelType should be additive/hierarchical");
+                    getDocument().firstDataset.multipleModelDatasetType.setValue(MIXED_MODEL_DATASET_TYPE.hierarchical);
+                }
+            });
         }
 
         void setFixedOrVariableNumberOfSamples(
@@ -1176,6 +1223,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             binaryCardLayout.show(binaryCards, fixedOrVariableSize.toString());
         }
 
+        
         void updateGuiToData() {
             fixedSampleNumberCaseControlPanel.updateGuiToData();
             caseControlPanel.updateGuiToData();
@@ -1195,6 +1243,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         public FixedSampleNumberCaseControlPanel() {
             setAlignmentY(Component.TOP_ALIGNMENT);
             setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+            
             add(new JLabel("Move slider to set case control counts."));
             add(proportionSlider);
             proportionSlider.addChangeListener(new javax.swing.event.ChangeListener() {
@@ -1203,6 +1252,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
                     updateGuiToData();
                 }
             });
+            
             caseProportionField = addBackedLabel(this, getDocument().firstDataset.caseProportion, 3,
                     "Case proportion:");
             caseCountField = addBackedLabel(this, new DocInteger(), 3, "Number of cases:"); // The
@@ -1241,8 +1291,6 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         private static final long serialVersionUID = 1L;
 
         public GenerateModelAction(final SnpGenMainWindow inWindow) {
-            // super(inWindow, "Add Model", null, "Add a model", KeyEvent.VK_M,
-            // KeyStroke.getKeyStroke(KeyEvent.VK_M, ActionEvent.ALT_MASK));
             super(inWindow, "Generate Model", null, "Generate a simulatedmodel", KeyEvent.VK_G,
                     KeyStroke.getKeyStroke(KeyEvent.VK_G, ActionEvent.ALT_MASK));
         }
@@ -1280,7 +1328,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             try {
                 mSnpGen.createSnpGenDocument();
             } catch (final IllegalAccessException iea) {
-            }
+          }
         }
     }
 
@@ -1293,10 +1341,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             setAlignmentX(Component.CENTER_ALIGNMENT);
             setLayout(new BoxLayout(this, BoxLayout.X_AXIS));
             field = addBackedInteger(this, getDocument().firstDataset.totalAttributeCount, 3,
-                    "Total number of attributes"); // The
-            // number
-            // of
-            // attributes
+                    "Total number of attributes"); // The number of attributes
             field.setText(SnpGenDocument.kDefaultAtrributeCount.toString());
 
             final JPanel mafPanel = new JPanel();
@@ -1338,18 +1383,9 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
 
             filenameLabel = (JLabel) SnpGenMainWindow.addComponent(JLabel.class, this, 0, "File:");
             attributeCountLabel = (JLabel) SnpGenMainWindow.addComponent(JLabel.class, this, 0,
-                    "Number of attributes:"); // The
-            // total
-            // number
-            // of
-            // attributes
+                    "Number of attributes:"); // The total number of attributes
             instanceCountLabel = (JLabel) SnpGenMainWindow.addComponent(JLabel.class, this, 0,
-                    "Total number of instances:"); // The
-            // total
-            // number
-            // of
-            // instances
-
+                    "Total number of instances:"); // The total number of instances
             // reset();
         }
 
@@ -1419,6 +1455,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
     }
 
+    // Non-predictive Attributes Panel
     public class NonPredictiveAttributesPanel extends JPanel implements ActionListener {
         private static final long serialVersionUID = 1L;
         JRadioButton generateNoiseButton;
@@ -1429,8 +1466,6 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         NoiseReader reader;
 
         public NonPredictiveAttributesPanel() {
-            setBorder(BorderFactory.createLineBorder(Color.gray));
-
             setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
             setBorder(BorderFactory.createTitledBorder("Non-predictive Attributes"));
             setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -1467,20 +1502,28 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             add(reader);
         }
 
+        // Given the input from "Read from file" vs. "Generate"
+        //    in the Non-predictive Attributes, section, perform a certain action!
+        // The input is "ActionEvent e"
         @Override
         public void actionPerformed(final ActionEvent e) {
+            // If e correspond to "generate", then show the required info
             if (e.getSource().equals(generateNoiseButton)) {
                 generator.setVisible(true);
                 reader.setVisible(false);
                 getDocument().firstDataset.totalCount
                         .setValue(SnpGenDocument.kDefaultCaseCount + SnpGenDocument.kDefaultControlCount);
                 endpointTypePanel.setFixedOrVariableNumberOfSamples(FIXED_OR_VARIABLE_NUMBER_OF_SAMPLES.VARIABLE);
-            } else if (e.getSource().equals(readNoiseButton)) {
+            }
+            
+            // Otherwise, if e corresponds to reading from file, show the correct info for it
+            else if (e.getSource().equals(readNoiseButton)) {
                 reader.reset();
                 generator.setVisible(false);
                 reader.setVisible(true);
                 endpointTypePanel.setFixedOrVariableNumberOfSamples(FIXED_OR_VARIABLE_NUMBER_OF_SAMPLES.FIXED);
             }
+            
             endpointTypePanel.updateGuiToData();
             updateSelection();
         }
@@ -1761,9 +1804,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
 
         public void guiToDocument() throws IllegalAccessException {
             for (final BackedComponent comp : backedComponents) {
-                // only store if the field is showing. This prevents
-                // caseProportion
-                // from being written into twice
+                // only store if the field is showing. This prevents caseProportion from being written into twice
                 if (((JComponent) comp).isShowing()) {
                     comp.store();
                 }

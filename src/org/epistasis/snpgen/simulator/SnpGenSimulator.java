@@ -41,6 +41,7 @@ public class SnpGenSimulator {
 
 
 	public SnpGenSimulator() {
+		
 	}
 
 	public void combineModelTablesIntoQuantiles(final ArrayList<DocModel> modelList, final File[] inputFiles) throws Exception {
@@ -122,9 +123,9 @@ public class SnpGenSimulator {
 		return penetranceTables;
 	}
 
-	// Output: Nested subdirectories named by #attributes, population size,
-	// model #; containing files named by model-name, population size, and
-	// replicate #
+	// Generate datasets given models
+	// Output: Nested subdirectories named by #attributes, population size, model #;
+	// containing files named by model-name, population size, and replicate #
 	// Example: parent-directory/100/400/Model10/Model10.400.007
 	public void generateDatasets(final ProgressHandler inProgressHandler) throws Exception {
 		String destFilename;
@@ -138,6 +139,7 @@ public class SnpGenSimulator {
 		int[][] noiseDataset;
 		int fileCount;
 
+		// Set the random seed here
 		setRandomSeed(document.randomSeed);
 		if ((ex = document.verifyDatasetParameters()) != null) {
 			throw ex;
@@ -145,7 +147,8 @@ public class SnpGenSimulator {
 		if (document.datasetList.size() > 0) {
 			System.out.println("Generating datasets...");
 		}
-
+		
+		// Begin dataset generation
 		predictiveDataset = null;
 		if (document.predictiveInputFile != null) {
 			predictiveDataset = SnpGenSimulator.parseDataInputFile(document.predictiveInputFile, null);
@@ -158,6 +161,7 @@ public class SnpGenSimulator {
 		if (inProgressHandler != null) {
 			int totalReplicateCount = 0;
 			for (final DocDataset dd : document.datasetList) {
+				System.out.println("Current dd multipleModelDataType is " + dd.multipleModelDatasetType + ", line 164");
 				totalReplicateCount += dd.replicateCount.getInteger();
 			}
 			final int maxProgress = penetranceTableQuantiles.length * totalReplicateCount;
@@ -180,8 +184,7 @@ public class SnpGenSimulator {
 			}
 
 			if (noiseDataset != null) {
-				datasetIterationCount = 1; // If the noise comes from a file
-				// then we only do one replicate
+				datasetIterationCount = 1; // If the noise comes from a file then we only do one replicate
 			}
 
 			final int maxQuantileNumberLength = (new Integer(penetranceTableQuantiles.length)).toString().length();
@@ -459,13 +462,13 @@ public class SnpGenSimulator {
 		}
 	}
 
-	// inAllTableScores[eachModel][eachScore]
-	public void writeTablesAndScoresToFile(final ArrayList<DocModel> modelList, final double[][] inAllTableScores, final int quantileCount)
-			throws IOException {
+	// Write out models
+	public void writeTablesAndScoresToFile(final ArrayList<DocModel> modelList, 
+			final double[][] inAllTableScores, final int quantileCount) throws IOException {
+		
 		final int modelCount = modelList.size();
 
-		// Write scores to the output files, and calculate
-		// tablePopulationCountFoundMinimum:
+		// Write scores to the output files, and calculate tablePopulationCountFoundMinimum:
 		Integer tablePopulationCountFoundMinimum = null;
 		for (int whichModel = 0; whichModel < modelCount; ++whichModel) {
 			final DocModel model = modelList.get(whichModel);
@@ -479,8 +482,7 @@ public class SnpGenSimulator {
 					if ((tablePopulationCountFoundMinimum == null) || (tablePopulationCount < tablePopulationCountFoundMinimum)) {
 						tablePopulationCountFoundMinimum = tablePopulationCount;
 					}
-					// scoreStream.println(scoreName + " scores for model: " +
-					// whichModel);
+					// scoreStream.println(scoreName + " scores for model: " + whichModel);
 					scoreStream.println(scoreName + " scores");
 					for (int i = 0; i < tablePopulationCount; ++i) {
 						scoreStream.println(populationScores[i]);
@@ -488,32 +490,12 @@ public class SnpGenSimulator {
 				}
 				final File tablesFile = calcCombinedFilename(destFile, "_Models", "txt");
 				assert quantileCount == model.getQuantileCountInModel();
+				
 				final String header = "Selected " + quantileCount + " " + scoreName + " quantiles from a population of "
 						+ tablePopulationCountFoundMinimum + " tables.";
+				
 				writeModelTables(model, tablesFile, header, false);
-				// PrintWriter tableStream = null;
-				// try
-				// {
-				// tableStream = new PrintWriter(new FileWriter(tablesFile,
-				// false));
-				// tableStream.println("Selected " + quantileCount + " " +
-				// scoreName + " quantiles from a population of " +
-				// tablePopulationCountFoundMinimum + " tables.");
-				// }
-				// finally
-				// {
-				// if (tableStream != null)
-				// tableStream.close();
-				// }
-				//
-				// PenetranceTable[] tables = model.getPenetranceTables();
-				// for(int q = 0; q < quantileCount; ++q)
-				// {
-				// if(tables.length > q)
-				// {
-				// tables[q].saveToFile(tablesFile, true, false);
-				// }
-				// }
+				
 			}
 		}
 	}
@@ -560,8 +542,7 @@ public class SnpGenSimulator {
 		return outTable;
 	}
 
-	// Returns the number of tables found, from which the desired quantiles were
-	// chosen.
+	// Returns the number of tables found, from which the desired quantiles were chosen.
 	private double[] generateTablesForOneModel(final DocModel model, final int desiredQuantileCount, final int inDesiredPopulationCount,
 			final int inTryCount, final ProgressHandler inProgressHandler, final int inProgressValueBase) throws Exception {
 		double[] outAllTableScores;
@@ -687,8 +668,7 @@ public class SnpGenSimulator {
 		int matchingTable;
 		int priorMatchingTable = -1;
 
-		// Copy the tables from the appropriate spots in
-		// outPenetranceTableQuantiles to the model:
+		// Copy the tables from the appropriate spots in outPenetranceTableQuantiles to the model:
 		final PenetranceTable[] modelTables = new PenetranceTable[inQuantileCount];
 		model.setPenetranceTables(modelTables);
 
@@ -699,18 +679,15 @@ public class SnpGenSimulator {
 
 		quantileIter = 0;
 		if (inQuantileCount > 1) {
-			// If there's more than one quantile, then we know that the first
-			// quantile is the very first table.
+			// If there's more than one quantile, then we know that the first quantile is the very first table.
 			modelTables[quantileIter++] = tablePopulation[tableIter++];
 			priorMatchingTable = 0;
 		}
 		for (; tableIter < tablePopulationSize; ++tableIter) {
-			// Look for the first reliefAccuracyScore greater than the current
-			// target:
+			// Look for the first reliefAccuracyScore greater than the current target:
 			if (tablePopulation[tableIter].getQuantileScore(useOddsRatio) > targetRASs[quantileIter]) {
 				// If the table before the current table is closer to the target
-				// than the current table, and is available,
-				// then use it; else use the current table:
+				// than the current table, and is available, then use it; else use the current table:
 				if ((tableIter > 0)
 						&& (Math.abs(tablePopulation[tableIter - 1].getQuantileScore(useOddsRatio) - targetRASs[quantileIter]) < Math
 								.abs(tablePopulation[tableIter].getQuantileScore(useOddsRatio) - targetRASs[quantileIter]))) {
@@ -851,15 +828,8 @@ public class SnpGenSimulator {
 
 		int attributeCountPredictiveFromFile = 0;
 		if (inPredictiveDataset != null) {
-			attributeCountPredictiveFromFile = inPredictiveDataset[0].length - 1; // The
-			// columns
-			// in
-			// inPredictiveDataset,
-			// not
-			// counting
-			// the
-			// class
-			// column
+			attributeCountPredictiveFromFile = inPredictiveDataset[0].length - 1; // The columns in inPredictiveDataset,
+			// not counting the class column
 		}
 
 		final int predictiveAttributeCount = attributeCountPredictiveFromTables + attributeCountPredictiveFromFile;
@@ -875,18 +845,11 @@ public class SnpGenSimulator {
 		final int instanceCount = (inNoiseDataset != null) ? inNoiseDataset.length : dd.totalCount.getInteger().intValue();
 
 		if (inNoiseDataset != null) {
-			// If there is a noise dataset then we don't generate any noise
-			// attributes:
-			totalAttributeCount = predictiveAttributeCount + attributeCountNoiseFile; // ALERT:
-			// we
-			// ignore
-			// inTotalAttributeCount
-			// in
-			// this
-			// case
+			// If there is a noise dataset then we don't generate any noise attributes:
+			totalAttributeCount = predictiveAttributeCount + attributeCountNoiseFile; 
+			// ALERT: we ignore inTotalAttributeCount in this case
 			attributeCountNoiseGenerated = 0;
-			// and we base caseCount and controlCount on the number of instances
-			// in the noise dataset:
+			// and we base caseCount and controlCount on the number of instances in the noise dataset:
 		} else {
 			// If there is *no* noise dataset we generate exactly enough noise
 			// to fill out the desired number of attributes:
@@ -901,8 +864,7 @@ public class SnpGenSimulator {
 		double penetrance;
 		PenetranceTable.CellId cellId;
 		double sumCaseFractions, sumControlFractions;
-		// caseIntervals[i] == the right edge of the ith probability-interval
-		// for cases; similarly for controls
+		// caseIntervals[i] == the right edge of the ith probability-interval for cases; similarly for controls
 		double[][] caseIntervals, controlIntervals;
 		int[][] outputArray = null;
 		if (inReturnDataset) {
@@ -953,8 +915,7 @@ public class SnpGenSimulator {
 
 
 			// Generate allele frequencies
-			// For each attribute, frequency[0] is the major-major allele and
-			// frequency[2] is the minor-minor allele.
+			// For each attribute, frequency[0] is the major-major allele and frequency[2] is the minor-minor allele.
 			final double[][] alleleFrequencies = new double[attributeCountNoiseGenerated][3];
 			final double alleleFrequencyMin = dd.alleleFrequencyMin.getDouble().doubleValue();
 			final double alleleFrequencyRange = dd.alleleFrequencyMax.getDouble().doubleValue() - alleleFrequencyMin;
@@ -972,8 +933,7 @@ public class SnpGenSimulator {
 					cellId = new PenetranceTable.CellId(inTables[j].attributeCount);
 					double sumGenotypeFractions = 0.0;
 					genotypeIntervals[j] = new double[inTables[j].cellCount];
-					// Sum up all the count fractions, storing the partial
-					// count-fractions to the array
+					// Sum up all the count fractions, storing the partial count-fractions to the array
 					for (int i = 0; i < inTables[j].cellCount; ++i) {
 						inTables[j].masterIndexToCellId(i, cellId);
 						// Note the getProbabilityProduct uses the
@@ -986,11 +946,8 @@ public class SnpGenSimulator {
 					}
 					assert Math.abs(sumGenotypeFractions - 1.0) < SnpGenSimulator.kErrorLimit;
 				}
-				// Now, the length of the interval from genotypeIntervals[i-1]
-				// to
-				// genotypeIntervals[i]
-				// == the proportion of samples that will have that cells
-				// genotype
+				// Now, the length of the interval from genotypeIntervals[i-1] to genotypeIntervals[i]
+				// == the proportion of samples that will have that cells genotype
 
 				for (int j = 0; j < tableCount; ++j) {
 					inTables[j].clear();
@@ -999,11 +956,9 @@ public class SnpGenSimulator {
 						attributeCountNoiseGenerated, alleleFrequencies, 1, dd.totalCount.getInteger(), genotypeIntervals, outputStream,
 						outputArray, 0, modelFractions);
 			} else {
-				// Calculate the values of caseIntervals and controlIntervals,
-				// such
+				// Calculate the values of caseIntervals and controlIntervals, such
 				// that the length of each interval is the desired probability
-				// of a given case or control (respectively) landing in a given
-				// cell.
+				// of a given case or control (respectively) landing in a given cell.
 				// This is used for sampling the cells in the dataset.
 				final int tableCount = inTables.length;
 				caseIntervals = new double[tableCount][];
@@ -1016,13 +971,11 @@ public class SnpGenSimulator {
 					controlIntervals[j] = new double[inTables[j].cellCount];
 					// Sum up all the case-fractions, storing the partial
 					// case-fractions to the caseIntervals array; do the same
-					// with
-					// controls:
+					// with controls:
 					for (int i = 0; i < inTables[j].cellCount; ++i) {
 						inTables[j].masterIndexToCellId(i, cellId);
-						// Note the getProbabilityProduct uses the
-						// alleleFrequencies which were provided when the
-						// penetrance table was constructed
+						// Note the getProbabilityProduct uses the alleleFrequencies which were
+						// provided when the penetrance table was constructed
 						prob = inTables[j].getProbabilityProduct(cellId);
 						penetrance = inTables[j].getPenetranceValue(cellId);
 
@@ -1033,8 +986,7 @@ public class SnpGenSimulator {
 					}
 					assert Math.abs((sumCaseFractions + sumControlFractions) - 1.0) < SnpGenSimulator.kErrorLimit;
 					// Divide each element of caseIntervals and controlIntervals
-					// by
-					// the appropriate total sum.
+					// by the appropriate total sum.
 					for (int i = 0; i < inTables[j].cellCount; ++i) {
 						caseIntervals[j][i] /= sumCaseFractions;
 						controlIntervals[j][i] /= sumControlFractions;
@@ -1043,8 +995,7 @@ public class SnpGenSimulator {
 				// Now, the length of the interval from caseIntervals[i-1] to
 				// caseIntervals[i]
 				// == the probability that a random case is in the ith cell of
-				// the
-				// penetrance table; similarly for controls.
+				// the penetrance table; similarly for controls.
 
 				for (int j = 0; j < tableCount; ++j) {
 					inTables[j].clear();
@@ -1085,18 +1036,15 @@ public class SnpGenSimulator {
 		return outWhich;
 	}
 
-	// public void generateDatasets() throws Exception
-	// {
-	// generateDatasets(progressHandler);
-	// }
 
-	private static void printInstances(final DocDataset dd, final Random inRandom, final int[][] inPredictiveDataset,
-			final int[][] inNoiseDataset,
+	private static void printInstances(final DocDataset dd, final Random inRandom, 
+			final int[][] inPredictiveDataset, final int[][] inNoiseDataset,
 			final int inWhichFirstNoise, final PenetranceTable[] inTables, final int inNoiseAttributeCount,
 			final double[][] inAlleleFrequencies, final int inInstanceClass, final int inInstanceCount,
 			final double[][] inInstanceIntervals, final PrintWriter inOutputStream, final int[][] inOutputArray,
 			final int inFirstOutputLine, final double[] modelFractions)
 					throws Exception {
+		
 		double rand;
 		int whichCell;
 		PenetranceTable.CellId cellId;
@@ -1104,11 +1052,7 @@ public class SnpGenSimulator {
 
 		int predictiveDatasetAttributeCount = 0;
 		if (inPredictiveDataset != null) {
-			predictiveDatasetAttributeCount = inPredictiveDataset[0].length - 1; // Don't
-			// count
-			// the
-			// class
-			// column
+			predictiveDatasetAttributeCount = inPredictiveDataset[0].length - 1; // Don't count the class column
 		}
 		int whichPredictive = 0;
 
@@ -1140,17 +1084,23 @@ public class SnpGenSimulator {
 		for (final double modelFraction : modelFractions) {
 			sumTableFractions += modelFraction;
 		}
+		
 		assert Math.abs(sumTableFractions - 1.0d) < 0.00001d : "sum of model weights should be 1 but is: " + sumTableFractions
 		+ " table weights: " + Arrays.toString(modelFractions);
+		
+		System.out.println("Current multiple model type is " + dd.multipleModelDatasetType.getValue() + ", line 1091");
+		
+		// Iterate over each row
 		for (int row = 0; row < inInstanceCount; ++row) {
-
 			Integer heterogeneousCurrentTable = null;
-			if (dd.multipleModelDatasetType.getValue() == SnpGenDocument.MIXED_MODEL_DATASET_TYPE.heterogeneous) {
+			// If the multipleModelDatasetType is heterogeneous...
+			if (dd.multipleModelDatasetType.getValue() == SnpGenDocument.MIXED_MODEL_DATASET_TYPE.heterogeneous){
+				// System.out.println("Current multipleModelDatasetType is heterogenenous, line 1094");
+				
 				// Figure out which table has the signal for the current row:
 				final double rowFraction = (double) row / inInstanceCount;
 				double tableFractionBefore = 0;
-				// slight doubling-point
-				// discrepancies.
+				// slight doubling-point discrepancies.
 				for (int k = 0; k < inTables.length; ++k) {
 					final double currentTableFraction = modelFractions[k];
 					if (rowFraction < (tableFractionBefore + currentTableFraction)) {
@@ -1159,14 +1109,16 @@ public class SnpGenSimulator {
 					}
 					tableFractionBefore += currentTableFraction;
 				}
-			}	//end if using heterogeneous models
+			}
+			
+			
 			int destWhich = 0;
-
 			if (inNoiseDataset != null) {
 				// Copy the noise attributes from inNoiseDataset
 				if (whichNoise >= inNoiseDataset.length) {
 					throw new Exception("Not enough noise input data");
 				}
+				
 				for (int j = 0; j < noiseDatasetAttributeCount; ++j) {
 					SnpGenSimulator.valueToOutput(inNoiseDataset[whichNoise][j], null, inOutputStream, true, inOutputArray,
 							whichOutputLine, destWhich++);
@@ -1175,25 +1127,15 @@ public class SnpGenSimulator {
 			}
 
 			// Generate noise attributes
+			// System.out.println("Generating random noise attributes, line 1126");
 			for (int j = 0; j < inNoiseAttributeCount; ++j) {
-				SnpGenSimulator
-				.noiseToOutput(inRandom, inAlleleFrequencies[j], inOutputStream, inOutputArray, whichOutputLine, destWhich++);
-				// rand = inRandom.nextDouble();
-				// if(rand < inAlleleFrequencyIntervals[0][j])
-				// valueToOutput(kMajorMajor, inOutputStream, true,
-				// inOutputArray, whichOutputLine, destWhich++);
-				// else if(rand < inAlleleFrequencyIntervals[1][j])
-				// valueToOutput(kMajorMinor, inOutputStream, true,
-				// inOutputArray, whichOutputLine, destWhich++);
-				// else
-				// valueToOutput(kMinorMinor, inOutputStream, true,
-				// inOutputArray, whichOutputLine, destWhich++);
+				SnpGenSimulator.noiseToOutput(inRandom, inAlleleFrequencies[j], inOutputStream, inOutputArray,
+						whichOutputLine, destWhich++);
 			}
 
 			if (inPredictiveDataset != null) {
 				// Copy the predictive attributes from inPredictiveDataset:
-				// First, find a match in inPredictiveDataset for
-				// inInstanceClass:
+				// First, find a match in inPredictiveDataset for inInstanceClass:
 				while ((whichPredictive < inPredictiveDataset.length)
 						&& (inPredictiveDataset[whichPredictive][predictiveDatasetAttributeCount] != inInstanceClass)) {
 					++whichPredictive;
@@ -1208,41 +1150,32 @@ public class SnpGenSimulator {
 				++whichPredictive;
 			}
 
-			// We're going to put the current instance (either a case or a
-			// control, as determined by this method's caller; let's say it's a
-			// case)
-			// into some cell of each specified table.
-			// Let's say there are three tables.
-			// Then we're going to put the current case into some cell of the
-			// first table,
-			// and, simultaneously, into some cell of the second table, and some
-			// cell of the third table.
-			// Equivalently, we're going to put the case into some cell of the
-			// cross-product of the three tables:
-			// if the first table is 2-D, the second table is 4-D, and the third
-			// table is 3-D,
-			// then we are choosing a cell in the 9-D table which is the
-			// cross-product of the three given tables.
-			// (Added later: I'm not sure what the above comment is in aid of.)
-
-			// As we iterate through the outer loop, we need to fill in each
-			// table's cellCaseCount or cellControlCount, as determined by
+			// We're going to put the current instance (either a case or a control, as determined by
+			// this method's caller; let's say it's a case) into some cell of each specified table.
+			// Let's say there are three tables. Then we're going to put the current case into some
+			// cell of the first table, and, simultaneously, into some cell of the second table, and some
+			// cell of the third table. Equivalently, we're going to put the case into some cell of the
+			// cross-product of the three tables: if the first table is 2-D, the second table is 4-D, and the third
+			// table is 3-D, then we are choosing a cell in the 9-D table which is the cross-product of the three
+			// given tables.
+			
+			// (Added later: I'm not sure what the above comment is in aid of.) As we iterate through the outer
+			// loop, we need to fill in each table's cellCaseCount or cellControlCount, as determined by
 			// inInstanceClass (a kluge).
 
-			// System.out.println("signal\t" + whichSignalTable);
-
 			double phenotypeValue = 0.0;
-			// now generate values for each of the model columns
+			
+			// Generate values for each of the model columns
+			//System.out.println("inTables.length is " + inTables.length);
 			for (int whichTable = 0; whichTable < inTables.length; ++whichTable) {
 				final PenetranceTable table = inTables[whichTable];
 				cellId = new PenetranceTable.CellId(table.attributeCount);
 
-				// do we need to use the model's penetrance or is the model
-				// being skipped due to heterogeneity?
+				// Do we need to use the model's penetrance or is the model being skipped due to heterogeneity?
 				if ((dd.multipleModelDatasetType.getValue() == SnpGenDocument.MIXED_MODEL_DATASET_TYPE.heterogeneous) && (whichTable != heterogeneousCurrentTable)) {
-					// System.out.println("noise");
-					// The current table is not the signal table, so generate
-					// noise:
+					// The current table is not the signal table, so generate noise:
+					// System.out.println("Generating data for the next heterogeneous table, line 1172");
+					
 					for (int j = 0; j < table.attributeCount; ++j) {
 						table.getAlleleFrequencies(j, alleleFrequencies);
 						final int whichValue = SnpGenSimulator.noiseToOutput(inRandom, alleleFrequencies, inOutputStream, inOutputArray,
@@ -1256,12 +1189,12 @@ public class SnpGenSimulator {
 						++table.cellControlCount[whichCell];
 					}
 				}
-				else { //must either be hierarchical or it is heterogeneous and this row uses the current table
+				
+				else { // Must either be hierarchical or it is heterogeneous and this row uses the current table
 					assert (dd.multipleModelDatasetType.getValue() == SnpGenDocument.MIXED_MODEL_DATASET_TYPE.hierarchical)
 					|| (whichTable == heterogeneousCurrentTable);
-					// System.out.println("signal");
-					// Pick a random number from 0 to 1 and see which
-					// instance-interval it's in:
+					
+					// Pick a random number from 0 to 1 and see which instance-interval it's in:
 					rand = inRandom.nextDouble();
 					whichCell = -1;
 					for (int k = 0; k < table.cellCount; ++k) {
@@ -1272,18 +1205,14 @@ public class SnpGenSimulator {
 					}
 
 					if (dd.createContinuousEndpoints.getBoolean()) {
-						// if creating continuous endpoints use the cell's
-						// penetrance value as the mean of a distribution
+						// if creating continuous endpoints use the cell's penetrance value as the mean of a distribution
 						final double penetranceForCell = table.cells[whichCell].getValue();
 						final double nextGaussian = inRandom.nextGaussian();
 						// see
 						// http://www.javamex.com/tutorials/random_numbers/gaussian_distribution_2.shtml
-						// Random.nextGaussian() method returns random numbers
-						// with a mean of 0 and a standard deviation of 1.
-						// to change the standard deviation, we multiply the
-						// value.
-						// to change the mean (average) of the distribution, we
-						// add the required value;
+						// Random.nextGaussian() method returns random numbers with a mean of 0 and a standard dev of 1.
+						// To change the standard deviation, we multiply the value.
+						// To change the mean (average) of the distribution, we add the required value;
 						final double continuousEndpoint = (nextGaussian * dd.continuousEndpointsStandardDeviation.getDouble())
 								+ penetranceForCell;
 						if (dd.multipleModelDatasetType.getValue() == SnpGenDocument.MIXED_MODEL_DATASET_TYPE.heterogeneous) {
@@ -1295,26 +1224,26 @@ public class SnpGenSimulator {
 							final double weightedContinuousEndpoint = continuousEndpoint * modelFractions[whichTable];
 							phenotypeValue += weightedContinuousEndpoint;
 						}
-						// System.err.println("row-" + row + " whichCell-" +
-						// whichCell + " penetranceForCell-" + penetranceForCell
-						// + " scaledOntoRangePenetrance-" +
-						// scaledOntoRangePenetrance + " continuousEndpoint-" +
-						// continuousEndpoint);
+
 					} else {
 						// if not continuous data use 0 or 1
 						phenotypeValue = inInstanceClass;
 					}
+					
 					assert (0 <= whichCell) && (whichCell < table.cellCount);
+					
 					if (inInstanceClass == 1) {
 						++table.cellCaseCount[whichCell];
 					} else {
 						++table.cellControlCount[whichCell];
 					}
+					
 					table.masterIndexToCellId(whichCell, cellId);
+					
 					for (int k = 0; k < table.attributeCount; ++k) {
 						final int alleleSymbol = SnpGenSimulator.kAlleleSymbols[cellId.getIndex(k)];
-						SnpGenSimulator.valueToOutput(alleleSymbol, null, inOutputStream,
-								true, inOutputArray, whichOutputLine, destWhich++);
+						
+						SnpGenSimulator.valueToOutput(alleleSymbol, null, inOutputStream, true, inOutputArray, whichOutputLine, destWhich++);
 					}
 				}
 			} // end which Table
@@ -1323,9 +1252,11 @@ public class SnpGenSimulator {
 
 			SnpGenSimulator.valueToOutput(inInstanceClass, instanceClassRepresentation, inOutputStream, false, inOutputArray,
 					whichOutputLine, destWhich++);
+			
 			if (inOutputStream != null) {
 				inOutputStream.println();
 			}
+			
 			++whichOutputLine;
 		}
 
@@ -1499,9 +1430,4 @@ public class SnpGenSimulator {
 
 		public void setValue(int inMax);
 	}
-
-	// private static class PenetranceTablePopulation {
-	// public int currentTableCount;
-	// public PenetranceTable[] tables;
-	// }
 }
