@@ -1,0 +1,44 @@
+---
+title: "Max Heritability Plot"
+author: "Vivek Sriram"
+date: "11/22/2019"
+output: pdf_document
+---
+
+```{r}
+library(ggplot2)
+library(knitr)
+library(kableExtra)
+```
+
+
+```{r}
+maxHeritabilityDf = data.frame(matrix(ncol = 2, nrow = 5))
+colnames(maxHeritabilityDf) = c("heritability", "numModelsFound")
+maxHeritabilityDf$heritability = c(".9", ".99", ".999", ".9999", ".99999")
+maxHeritabilityDf$numModelsFound = c(3671, 299, 16, 2, 0)
+```
+
+
+```{r}
+maxHerPlot = ggplot(maxHeritabilityDf, aes(x = heritability, y = numModelsFound, ymax = max(maxHeritabilityDf$numModelsFound)+100)) +
+  geom_col() +
+  scale_x_discrete("Heritability") +
+  scale_y_continuous("Number of Models Found (out of 10000)") +
+  geom_text(aes(label=numModelsFound), position=position_dodge(width=0.6), vjust=-0.5) +
+  ggtitle("Maximum Number of Models per Heritability")
+
+maxHerPlot
+ggsave("/Users/viveksriram/Desktop/GAMETES-2.2/src/testingEffectsOfHeritability/maxHeritabilityTests/numModelsFoundOutput.eps")
+```
+
+
+```{r}
+text_tbl <- data.frame(
+  Heritability = c(".9", ".99", ".999", ".9999", ".99999"),
+  "Number of Features Identified (out of 10^4)" = c(3671, 299, 16, 2, 0)
+)
+
+kable(text_tbl)  %>%
+  kable_styling()
+```

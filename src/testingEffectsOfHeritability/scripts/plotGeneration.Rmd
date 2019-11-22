@@ -1,0 +1,557 @@
+---
+title: "Post-Data Simulation ML Pipeline Analysis"
+author: "Vivek Sriram"
+date: "11/22/2019"
+output: pdf_document
+---
+
+In this markdown document, we will perform machine learning/feature importance analysis on the results of our GAMETES simulated data. We will then produce plots that give us summary information on the behavior of machine learners on our data, both in terms of accuracy as well as for picking the correct top feature(s).
+
+```{r, include=FALSE}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(readtext)
+```
+
+```{r include=FALSE}
+parentDir = "/Users/viveksriram/Desktop/GAMETES-2.2/src/testingEffectsOfHeritability/varyingHeritabilityTests/"
+heritabilityValues = c("00", "10", "20", "30", "40", "50", "60", "70", "80" , "90")
+datasetTypes = c("m1", "m2", "m1m2Additive", "m1m2Heterogeneous")
+```
+
+```{r include=FALSE}
+readInFile <- function(filePath) {
+  currentFile = c(readtext(currentFilePath)$text)
+  currentFile = substr(currentFile, 2, nchar(currentFile)-1)
+  newCurrentFile = as.numeric(unlist(strsplit(currentFile, split=", ")))
+  newCurrentFile
+}
+```
+
+
+## Mann-Whitney Output
+```{r include=FALSE}
+mwDf = data.frame(matrix(ncol = 3, nrow = 40))
+colnames(mwDf) = c("datasetType", "heritability", "positiveAvg")
+
+i = 1
+for(currHer in heritabilityValues){
+  for(currDatasetType in datasetTypes){
+    currentFilePath = paste0(parentDir, "heritability_", currHer, "/", currDatasetType, "_EDM-1/output/mwOutput.txt")
+    positiveScores = readInFile(currentFilePath)
+    
+    mwDf$datasetType[i] = currDatasetType
+    mwDf$heritability[i] = as.numeric(currHer)/100
+    mwDf$positiveAvg[i] = mean(positiveScores)
+    
+    i = i+1
+  }
+}
+
+# head(mwDf)
+```
+
+```{r echo=FALSE}
+mwPositive = ggplot(mwDf, aes(x = heritability, y = positiveAvg, color = datasetType, shape = datasetType)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous("Heritability", breaks = c(0.00, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90)) +
+  scale_y_continuous("Proportion of Times Top Trait(s) Were Found") +
+  ggtitle("Mann-Whitney: Proportion of Times the Top Trait(s) Were Found by Heritability")
+
+mwPositive
+ggsave(paste0(parentDir, "summaryPlots/mannWhitneyProportionOutput.eps"))
+```
+
+## Pearson Correlation Output
+```{r include=FALSE}
+pcDf = data.frame(matrix(ncol = 3, nrow = 40))
+colnames(pcDf) = c("datasetType", "heritability", "positiveAvg")
+
+i = 1
+for(currHer in heritabilityValues){
+  for(currDatasetType in datasetTypes){
+    currentFilePath = paste0(parentDir, "heritability_", currHer, "/", currDatasetType,  "_EDM-1/output/pcOutput.txt")
+    positiveScores = readInFile(currentFilePath)
+    
+    pcDf$datasetType[i] = currDatasetType
+    pcDf$heritability[i] = as.numeric(currHer)/100
+    pcDf$positiveAvg[i] = mean(positiveScores)
+    
+    i = i+1
+  }
+}
+
+# head(pcDf)
+```
+
+```{r echo=FALSE}
+pcPositive = ggplot(pcDf, aes(x = heritability, y = positiveAvg, color = datasetType, shape = datasetType)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous("Heritability", breaks = c(0.00, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90)) +
+  scale_y_continuous("Proportion of Times Top Trait(s) Were Found") +
+  ggtitle("Pearson Correlation: Proportion of Times the Top Trait(s) Were Found by Heritability")
+
+pcPositive
+ggsave(paste0(parentDir, "summaryPlots/pearsonCorrelationProportionOutput.eps"))
+```
+
+## Spearman Correlation Output
+```{r include=FALSE}
+scDf = data.frame(matrix(ncol = 3, nrow = 40))
+colnames(scDf) = c("datasetType", "heritability", "positiveAvg")
+
+i = 1
+for(currHer in heritabilityValues){
+  for(currDatasetType in datasetTypes){
+    currentFilePath = paste0(parentDir, "heritability_", currHer, "/", currDatasetType,  "_EDM-1/output/scOutput.txt")
+    positiveScores = readInFile(currentFilePath)
+    
+    scDf$datasetType[i] = currDatasetType
+    scDf$heritability[i] = as.numeric(currHer)/100
+    scDf$positiveAvg[i] = mean(positiveScores)
+    
+    i = i+1
+  }
+}
+
+# head(scDf)
+```
+
+```{r echo=FALSE}
+scPositive = ggplot(scDf, aes(x = heritability, y = positiveAvg, color = datasetType, shape = datasetType)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous("Heritability", breaks = c(0.00, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90)) +
+  scale_y_continuous("Proportion of Times Top Trait(s) Were Found") +
+  ggtitle("Spearman Correlation: Proportion of Times the Top Trait(s) Were Found by Heritability")
+
+scPositive
+ggsave(paste0(parentDir, "summaryPlots/spearmanCorrelationProportionOutput.eps"))
+```
+
+## Logistic Regression Output
+```{r include=FALSE}
+lrDf = data.frame(matrix(ncol = 3, nrow = 40))
+colnames(lrDf) = c("datasetType", "heritability", "positiveAvg")
+
+i = 1
+for(currHer in heritabilityValues){
+  for(currDatasetType in datasetTypes){
+    currentFilePath = paste0(parentDir, "heritability_", currHer, "/", currDatasetType,  "_EDM-1/output/lrOutput.txt")
+    positiveScores = readInFile(currentFilePath)
+    
+    lrDf$datasetType[i] = currDatasetType
+    lrDf$heritability[i] = as.numeric(currHer)/100
+    lrDf$positiveAvg[i] = mean(positiveScores)
+    
+    i = i+1
+  }
+}
+
+# head(lrDf)
+```
+
+```{r echo=FALSE}
+lrPositive = ggplot(lrDf, aes(x = heritability, y = positiveAvg, color = datasetType, shape = datasetType)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous("Heritability", breaks = c(0.00, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90)) +
+  scale_y_continuous("Proportion of Times Top Trait(s) Were Found") +
+  ggtitle("Logistic Regression: Proportion of Times the Top Trait(s) Were Found by Heritability")
+
+lrPositive
+ggsave(paste0(parentDir, "summaryPlots/logisticRegressionProportionOutput.eps"))
+```
+
+
+## Mutual Information Output
+```{r include=FALSE}
+miDf = data.frame(matrix(ncol = 3, nrow = 40))
+colnames(miDf) = c("datasetType", "heritability", "positiveAvg")
+
+i = 1
+for(currHer in heritabilityValues){
+  for(currDatasetType in datasetTypes){
+    currentFilePath = paste0(parentDir, "heritability_", currHer, "/", currDatasetType,  "_EDM-1/output/miOutput.txt")
+    positiveScores = readInFile(currentFilePath)
+    
+    miDf$datasetType[i] = currDatasetType
+    miDf$heritability[i] = as.numeric(currHer)/100
+    miDf$positiveAvg[i] = mean(positiveScores)
+    
+    i = i+1
+  }
+}
+
+# head(miDf)
+```
+
+```{r echo=FALSE}
+miPositive = ggplot(miDf, aes(x = heritability, y = positiveAvg, color = datasetType, shape = datasetType)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous("Heritability", breaks = c(0.00, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90)) +
+  scale_y_continuous("Proportion of Times Top Trait(s) Were Found") +
+  ggtitle("Mutual Information: Proportion of Times the Top Trait(s) Were Found by Heritability")
+
+miPositive
+ggsave(paste0(parentDir, "summaryPlots/mutualInformationProportionOutput.eps"))
+```
+
+
+## Relief Feature Selection
+```{r include=FALSE}
+rfDf = data.frame(matrix(ncol = 3, nrow = 40))
+colnames(rfDf) = c("datasetType", "heritability", "positiveAvg")
+
+i = 1
+for(currHer in heritabilityValues){
+  for(currDatasetType in datasetTypes){
+    currentFilePath = paste0(parentDir, "heritability_", currHer, "/", currDatasetType,  "_EDM-1/output/rfOutput.txt")
+    positiveScores = readInFile(currentFilePath)
+    
+    rfDf$datasetType[i] = currDatasetType
+    rfDf$heritability[i] = as.numeric(currHer)/100
+    rfDf$positiveAvg[i] = mean(positiveScores)
+    
+    i = i+1
+  }
+}
+
+# head(rfDf)
+```
+
+```{r echo=FALSE}
+rfPositive = ggplot(rfDf, aes(x = heritability, y = positiveAvg, color = datasetType, shape = datasetType)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous("Heritability", breaks = c(0.00, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90)) +
+  scale_y_continuous("Proportion of Times Top Trait(s) Were Found") +
+  ggtitle("ReliefF: Proportion of Times the Top Trait(s) Were Found by Heritability")
+
+rfPositive
+ggsave(paste0(parentDir, "summaryPlots/reliefFProportionOutput.eps"))
+```
+
+
+## Decision Trees ML
+```{r include=FALSE}
+dtPositiveDf = data.frame(matrix(ncol = 3, nrow = 40))
+colnames(dtPositiveDf) = c("datasetType", "heritability", "positiveAvg")
+
+i = 1
+for(currHer in heritabilityValues){
+  for(currDatasetType in datasetTypes){
+    currentFilePath = paste0(parentDir, "heritability_", currHer, "/", currDatasetType,  "_EDM-1/output/dtPositiveOutput.txt")
+    positiveScores = readInFile(currentFilePath)
+
+    dtPositiveDf$datasetType[i] = currDatasetType
+    dtPositiveDf$heritability[i] = as.numeric(currHer)/100
+    dtPositiveDf$positiveAvg[i] = mean(positiveScores)
+    
+    i = i+1
+  }
+}
+
+# head(dtPositiveDf)
+```
+
+```{r echo=FALSE}
+dtPositive = ggplot(dtPositiveDf, aes(x = heritability, y = positiveAvg, color = datasetType, shape = datasetType)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous("Heritability", breaks = c(0.00, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90)) +
+  scale_y_continuous("Proportion of Times Top Trait(s) Were Found") +
+  ggtitle("Decision Trees: Proportion of Times the Top Trait(s) Were Found by Heritability")
+
+dtPositive
+ggsave(paste0(parentDir, "summaryPlots/decisionTreeProportionOutput.eps"))
+```
+
+
+```{r include=FALSE}
+dtAccuracyDf = data.frame(matrix(ncol = 3, nrow = 4000))
+colnames(dtAccuracyDf) = c("datasetType", "heritability", "accuracy")
+
+accuracyValues = c()
+
+for(currHer in heritabilityValues){
+  for(currDatasetType in datasetTypes){
+    currentFilePath = paste0(parentDir, "heritability_", currHer, "/", currDatasetType,  "_EDM-1/output/dtAccuracyOutput.txt")
+    accuracyScores = readInFile(currentFilePath)
+    accuracyValues = c(accuracyValues, accuracyScores)
+  }
+}
+
+# length(accuracyValues)
+
+#100 times for each dataset type within each heritability, 10 heritabilities
+datasetTypesNew = rep(rep(datasetTypes, each=100), 10)
+# length(datasetTypesNew)
+
+heritabilitiesNew = rep(heritabilityValues, each=400)
+# length(heritabilitiesNew)
+
+dtAccuracyDf$datasetType = datasetTypesNew
+dtAccuracyDf$heritability = as.numeric(heritabilitiesNew)/100
+dtAccuracyDf$accuracy = accuracyValues
+
+# head(dtAccuracyDf)
+```
+
+
+### Accuracy Plots
+```{r echo=FALSE}
+dtDf_m1 = dtAccuracyDf[dtAccuracyDf$datasetType == "m1",]
+dtDf_m1Plot = ggplot(dtDf_m1, aes(x = as.factor(heritability), y = accuracy)) +
+  geom_boxplot() +
+  scale_x_discrete("Heritability") +
+  scale_y_continuous("Accuracy") +
+  ggtitle("Decision Trees - Accuracy vs. Heritability for m1")
+dtDf_m1Plot
+ggsave(paste0(parentDir, "summaryPlots/decisionTreeAccuracyOutput_m1.eps"))
+
+dtDf_m2 = dtAccuracyDf[dtAccuracyDf$datasetType == "m2",]
+dtDf_m2Plot = ggplot(dtDf_m2, aes(x = as.factor(heritability), y = accuracy)) +
+  geom_boxplot() +
+  scale_x_discrete("Heritability") +
+  scale_y_continuous("Accuracy") +
+  ggtitle("Decision Trees - Accuracy vs. Heritability for m2")
+dtDf_m2Plot
+ggsave(paste0(parentDir, "summaryPlots/decisionTreeAccuracyOutput_m2.eps"))
+
+dtDf_m1m2Additive = dtAccuracyDf[dtAccuracyDf$datasetType == "m1m2Additive",]
+dtDf_m1m2AdditivePlot = ggplot(dtDf_m1m2Additive, aes(x = as.factor(heritability), y = accuracy)) +
+  geom_boxplot() +
+  scale_x_discrete("Heritability") +
+  scale_y_continuous("Accuracy") +
+  ggtitle("Decision Trees - Accuracy vs. Heritability for m1m2Additive")
+dtDf_m1m2AdditivePlot
+ggsave(paste0(parentDir, "summaryPlots/decisionTreeAccuracyOutput_m1m2Additive.eps"))
+
+dtDf_m1m2Heterogeneous = dtAccuracyDf[dtAccuracyDf$datasetType == "m1m2Heterogeneous",]
+dtDf_m1m2HeterogeneousPlot = ggplot(dtDf_m1m2Heterogeneous, aes(x = as.factor(heritability), y = accuracy)) +
+  geom_boxplot() +
+  scale_x_discrete("Heritability") +
+  scale_y_continuous("Accuracy") +
+  ggtitle("Decision Trees - Accuracy vs. Heritability for m1m2Heterogeneous")
+dtDf_m1m2HeterogeneousPlot
+ggsave(paste0(parentDir, "summaryPlots/decisionTreeAccuracyOutput_m1m2Heterogeneous.eps"))
+```
+
+
+## Random Forest ML
+```{r include=FALSE}
+randForestPositiveDf = data.frame(matrix(ncol = 3, nrow = 40))
+colnames(randForestPositiveDf) = c("datasetType", "heritability", "positiveAvg")
+
+i = 1
+for(currHer in heritabilityValues){
+  for(currDatasetType in datasetTypes){
+    currentFilePath = paste0(parentDir, "heritability_", currHer, "/", currDatasetType,  "_EDM-1/output/randForestPositiveOutput.txt")
+    positiveScores = readInFile(currentFilePath)
+
+    randForestPositiveDf$datasetType[i] = currDatasetType
+    randForestPositiveDf$heritability[i] = as.numeric(currHer)/100
+    randForestPositiveDf$positiveAvg[i] = mean(positiveScores)
+    
+    i = i+1
+  }
+}
+
+# head(randForestPositiveDf)
+```
+
+```{r echo=FALSE}
+randForestPositive = ggplot(randForestPositiveDf, aes(x = heritability, y = positiveAvg, color = datasetType, shape = datasetType)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous("Heritability", breaks = c(0.00, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90)) +
+  scale_y_continuous("Proportion of Times Top Trait(s) Were Found") +
+  ggtitle("Random Forest: Proportion of Times the Top Trait(s) Were Found by Heritability")
+
+randForestPositive
+ggsave(paste0(parentDir, "summaryPlots/randForestProportionOutput.eps"))
+```
+
+
+```{r include=FALSE}
+randForestAccuracyDf = data.frame(matrix(ncol = 3, nrow = 1200))
+colnames(randForestAccuracyDf) = c("datasetType", "heritability", "accuracy")
+
+accuracyValues = c()
+
+for(currHer in heritabilityValues){
+  for(currDatasetType in datasetTypes){
+    currentFilePath = paste0(parentDir, "heritability_", currHer, "/", currDatasetType,  "_EDM-1/output/randForestAccuracyOutput.txt")
+    accuracyScores = readInFile(currentFilePath)
+    accuracyValues = c(accuracyValues, accuracyScores)
+  }
+}
+
+# length(accuracyValues)
+
+#30 times for each dataset type within each heritability, 10 heritabilities
+datasetTypesNew = rep(rep(datasetTypes, each=30), 10)
+# length(datasetTypesNew)
+
+#4*30 = 120 times for each heritability
+heritabilitiesNew = rep(heritabilityValues, each=120)
+# length(heritabilitiesNew)
+
+randForestAccuracyDf$datasetType = datasetTypesNew
+randForestAccuracyDf$heritability = as.numeric(heritabilitiesNew)/100
+randForestAccuracyDf$accuracy = accuracyValues
+
+# head(randForestAccuracyDf)
+```
+
+
+### Accuracy Plots
+```{r echo=FALSE}
+randForestAccuracyDf_m1 = randForestAccuracyDf[randForestAccuracyDf$datasetType == "m1",]
+randForest_m1Plot = ggplot(randForestAccuracyDf_m1, aes(x = as.factor(heritability), y = accuracy)) +
+  geom_boxplot() +
+  scale_x_discrete("Heritability") +
+  scale_y_continuous("Accuracy") +
+  ggtitle("Random Forest - Accuracy vs. Heritability for m1")
+randForest_m1Plot
+ggsave(paste0(parentDir, "summaryPlots/randForestAccuracyOutput_m1.eps"))
+
+randForestAccuracyDf_m2 = randForestAccuracyDf[randForestAccuracyDf$datasetType == "m2",]
+randForest_m2Plot = ggplot(randForestAccuracyDf_m2, aes(x = as.factor(heritability), y = accuracy)) +
+  geom_boxplot() +
+  scale_x_discrete("Heritability") +
+  scale_y_continuous("Accuracy") +
+  ggtitle("Random Forest - Accuracy vs. Heritability for m2")
+randForest_m2Plot
+ggsave(paste0(parentDir, "summaryPlots/randForestAccuracyOutput_m2.eps"))
+
+randForestAccuracyDf_m1m2Additive = randForestAccuracyDf[randForestAccuracyDf$datasetType == "m1m2Additive",]
+randForest_m1m2AdditivePlot = ggplot(randForestAccuracyDf_m1m2Additive, aes(x = as.factor(heritability), y = accuracy)) +
+  geom_boxplot() +
+  scale_x_discrete("Heritability") +
+  scale_y_continuous("Accuracy") +
+  ggtitle("Random Forest - Accuracy vs. Heritability for m1m2Additive")
+randForest_m1m2AdditivePlot
+ggsave(paste0(parentDir, "summaryPlots/randForestAccuracyOutput_m1m2Additive.eps"))
+
+randForestAccuracyDf_m1m2Heterogeneous = randForestAccuracyDf[randForestAccuracyDf$datasetType == "m1m2Heterogeneous",]
+randForest_m1m2HeterogeneousPlot = ggplot(randForestAccuracyDf_m1m2Heterogeneous, aes(x = as.factor(heritability), y = accuracy)) +
+  geom_boxplot() +
+  scale_x_discrete("Heritability") +
+  scale_y_continuous("Accuracy") +
+  ggtitle("Random Forest - Accuracy vs. Heritability for m1m2Heterogeneous")
+randForest_m1m2HeterogeneousPlot
+ggsave(paste0(parentDir, "summaryPlots/randForestAccuracyOutput_m1m2Heterogeneous.eps"))
+```
+
+## XGBoost ML
+```{r include=FALSE}
+xgPositiveDf = data.frame(matrix(ncol = 3, nrow = 40))
+colnames(xgPositiveDf) = c("datasetType", "heritability", "positiveAvg")
+
+i = 1
+for(currHer in heritabilityValues){
+  for(currDatasetType in datasetTypes){
+    currentFilePath = paste0(parentDir, "heritability_", currHer, "/", currDatasetType,  "_EDM-1/output/xgPositiveOutput.txt")
+    positiveScores = readInFile(currentFilePath)
+
+    xgPositiveDf$datasetType[i] = currDatasetType
+    xgPositiveDf$heritability[i] = as.numeric(currHer)/100
+    xgPositiveDf$positiveAvg[i] = mean(positiveScores)
+    
+    i = i+1
+  }
+}
+
+# head(xgPositiveDf)
+```
+
+```{r echo=FALSE}
+xgPositive = ggplot(xgPositiveDf, aes(x = heritability, y = positiveAvg, color = datasetType, shape = datasetType)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous("Heritability", breaks = c(0.00, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90)) +
+  scale_y_continuous("Proportion of Times Top Trait(s) Were Found") +
+  ggtitle("XGBoost: Proportion of Times the Top Trait(s) Were Found by Heritability")
+
+xgPositive
+ggsave(paste0(parentDir, "summaryPlots/xgBoostProportionOutput.eps"))
+```
+
+
+```{r include=FALSE}
+xgAccuracyDf = data.frame(matrix(ncol = 3, nrow = 1200))
+colnames(xgAccuracyDf) = c("datasetType", "heritability", "accuracy")
+
+accuracyValues = c()
+
+for(currHer in heritabilityValues){
+  for(currDatasetType in datasetTypes){
+    currentFilePath = paste0(parentDir, "heritability_", currHer, "/", currDatasetType,  "_EDM-1/output/xgAccuracyOutput.txt")
+    accuracyScores = readInFile(currentFilePath)
+    accuracyValues = c(accuracyValues, accuracyScores)
+  }
+}
+
+# length(accuracyValues)
+
+#30 times for each dataset type within each heritability, 10 heritabilities
+datasetTypesNew = rep(rep(datasetTypes, each=30), 10)
+# length(datasetTypesNew)
+
+#4*30 = 120 times for each heritability
+heritabilitiesNew = rep(heritabilityValues, each=120)
+# length(heritabilitiesNew)
+
+xgAccuracyDf$datasetType = datasetTypesNew
+xgAccuracyDf$heritability = as.numeric(heritabilitiesNew)/100
+xgAccuracyDf$accuracy = accuracyValues
+
+# head(xgAccuracyDf)
+```
+
+
+### Accuracy Plots
+```{r echo=FALSE}
+xgAccuracyDf_m1 = xgAccuracyDf[xgAccuracyDf$datasetType == "m1",]
+xg_m1Plot = ggplot(xgAccuracyDf_m1, aes(x = as.factor(heritability), y = accuracy)) +
+  geom_boxplot() +
+  scale_x_discrete("Heritability") +
+  scale_y_continuous("Accuracy") +
+  ggtitle("XGBoost - Accuracy vs. Heritability for m1")
+xg_m1Plot
+ggsave(paste0(parentDir, "summaryPlots/xgBoostAccuracyOutput_m1.eps"))
+
+xgAccuracyDf_m2 = xgAccuracyDf[xgAccuracyDf$datasetType == "m2",]
+xg_m2Plot = ggplot(xgAccuracyDf_m2, aes(x = as.factor(heritability), y = accuracy)) +
+  geom_boxplot() +
+  scale_x_discrete("Heritability") +
+  scale_y_continuous("Accuracy") +
+  ggtitle("XGBoost - Accuracy vs. Heritability for m2")
+xg_m2Plot
+ggsave(paste0(parentDir, "summaryPlots/xgBoostAccuracyOutput_m2.eps"))
+
+xgAccuracyDf_m1m2Additive = xgAccuracyDf[xgAccuracyDf$datasetType == "m1m2Additive",]
+xg_m1m2AdditivePlot = ggplot(xgAccuracyDf_m1m2Additive, aes(x = as.factor(heritability), y = accuracy)) +
+  geom_boxplot() +
+  scale_x_discrete("Heritability") +
+  scale_y_continuous("Accuracy") +
+  ggtitle("XGBoost - Accuracy vs. Heritability for m1m2Additive")
+xg_m1m2AdditivePlot
+ggsave(paste0(parentDir, "summaryPlots/xgBoostAccuracyOutput_m1m2Additive.eps"))
+
+xgAccuracyDf_m1m2Heterogeneous = xgAccuracyDf[xgAccuracyDf$datasetType == "m1m2Heterogeneous",]
+xg_m1m2HeterogeneousPlot = ggplot(xgAccuracyDf_m1m2Heterogeneous, aes(x = as.factor(heritability), y = accuracy)) +
+  geom_boxplot() +
+  scale_x_discrete("Heritability") +
+  scale_y_continuous("Accuracy") +
+  ggtitle("XGBoost - Accuracy vs. Heritability for m1m2Heterogeneous")
+xg_m1m2HeterogeneousPlot
+ggsave(paste0(parentDir, "summaryPlots/xgBoostAccuracyOutput_m1m2Heterogeneous.eps"))
+```
+
