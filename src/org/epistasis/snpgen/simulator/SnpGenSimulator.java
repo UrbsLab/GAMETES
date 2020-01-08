@@ -1,5 +1,8 @@
 package org.epistasis.snpgen.simulator;
 
+import java.io.*;
+
+/*
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -7,6 +10,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+*/
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -26,19 +31,14 @@ public class SnpGenSimulator {
 	private static final int[] kAlleleSymbols = { SnpGenSimulator.kMajorMajor, SnpGenSimulator.kMajorMinor, SnpGenSimulator.kMinorMinor };
 
 	private static final String kAttributeToken = "Attribute names:";
-
 	private static final String kFrequencyToken = "Minor allele frequencies:";
-
 	private static final String kTableToken = "Table:";
 
 	private final Random random = new Random();
 
 	private PenetranceTableQuantile[] penetranceTableQuantiles;
-
 	private SnpGenDocument document;
-
 	private int tablePopulationCountFound;
-
 
 	public SnpGenSimulator() {
 		
@@ -54,8 +54,7 @@ public class SnpGenSimulator {
 
 		// Get the penetrance tables from the models:
 		if (modelCount > 0) {
-			// Each model has an array of penetrance tables, one for each
-			// quantile.
+			// Each model has an array of penetrance tables, one for each quantile
 			quantileCount1 = modelList.get(0).getPenetranceTables().length;
 			for (int whichModel = 1; whichModel < modelCount; ++whichModel) {
 				assert quantileCount1 == modelList.get(whichModel).getPenetranceTables().length;
@@ -77,11 +76,6 @@ public class SnpGenSimulator {
 			quantileCount2 = quantiles2.length;
 		}
 
-		// if ((quantiles1 == null) && (quantiles2 == null)) {
-		// throw new
-		// InputException("Must either generate models or get them from a file");
-		// }
-
 		// Combine the penetrance tables from the models and the input files:
 		int quantileCount;
 		if ((quantiles1 != null) && (quantiles2 != null)) {
@@ -96,10 +90,8 @@ public class SnpGenSimulator {
 			penetranceTableQuantiles = quantiles2;
 		}
 
-		// If there are no penetrance-table quantiles then create some empty
-		// ones:
-		// PCA must be generating datasets with no functional snps so penetrance
-		// irrelevant
+		// If there are no penetrance-table quantiles then create some empty ones: PCA must be
+		// generating datasets with no functional SNPs, so penetrance irrelevant
 		if (penetranceTableQuantiles == null) {
 			quantileCount = 0;
 			penetranceTableQuantiles = new PenetranceTableQuantile[quantileCount];
@@ -109,8 +101,7 @@ public class SnpGenSimulator {
 		}
 	}
 
-	// A model can only contain one penetrance table for each quantile, so
-	// that's all we fetch here.
+	// A model can contain only one penetrance table for each quantile, so that's all we fetch here.
 	public PenetranceTable[] fetchTables(final File inInputFile) throws Exception {
 		final PenetranceTableQuantile[] penetranceTableQuantiles = parseModelInputFile(inInputFile);
 		final int quantileCount = penetranceTableQuantiles.length;
@@ -124,7 +115,7 @@ public class SnpGenSimulator {
 	}
 
 	// Generate datasets given models
-	// Output: Nested subdirectories named by #attributes, population size, model #;
+	// Output: Nested subdirectories named by number of attributes, population size, model #;
 	// containing files named by model-name, population size, and replicate #
 	// Example: parent-directory/100/400/Model10/Model10.400.007
 	public void generateDatasets(final ProgressHandler inProgressHandler) throws Exception {
@@ -141,38 +132,51 @@ public class SnpGenSimulator {
 
 		// Set the random seed here
 		setRandomSeed(document.randomSeed);
+		
+		// If the parameters are bad, throw an error
 		if ((ex = document.verifyDatasetParameters()) != null) {
 			throw ex;
 		}
+		
+		// If we have at least one dataset to generate, continue
 		if (document.datasetList.size() > 0) {
 			System.out.println("Generating datasets...");
 		}
 		
 		// Begin dataset generation
 		predictiveDataset = null;
+		
+		// If a predicitve input file has been specified, parse through it and initialize predictiveDataset
 		if (document.predictiveInputFile != null) {
 			predictiveDataset = SnpGenSimulator.parseDataInputFile(document.predictiveInputFile, null);
 		}
+		
+		// If a noise dataset file has been specified, parse through it and initialize noiseDataset
 		noiseDataset = null;
 		if (document.noiseInputFile != null) {
 			noiseDataset = SnpGenSimulator.parseDataInputFile(document.noiseInputFile, null);
 		}
-
+		
+		// For each dataset specified, tally up the required number of replicates
 		if (inProgressHandler != null) {
 			int totalReplicateCount = 0;
 			for (final DocDataset dd : document.datasetList) {
-				System.out.println("Current dd multipleModelDataType is " + dd.multipleModelDatasetType + ", line 164");
+				//System.out.println("Current dd multipleModelDataType is " + dd.multipleModelDatasetType + ", line 164");
 				totalReplicateCount += dd.replicateCount.getInteger();
 			}
 			final int maxProgress = penetranceTableQuantiles.length * totalReplicateCount;
 			inProgressHandler.setMaximum(maxProgress);
 		}
+		
 		fileCount = 0;
 		final boolean createDirectories = (document.datasetList.size() > 1);
+		
 		for (final DocDataset dd : document.datasetList) {
+			// Make the file corresponding to each dataset
 			destFilename = null;
 			directory = null;
-			destFile = dd.outputFile;
+			destFile = dd.outputFile;			
+	
 			if (destFile != null) {
 				if (createDirectories) {
 					directory = destFile;
@@ -183,57 +187,69 @@ public class SnpGenSimulator {
 				destFilename = destFile.getName();
 			}
 
+			// If the noise comes from a file then we do only one replicate
 			if (noiseDataset != null) {
-				datasetIterationCount = 1; // If the noise comes from a file then we only do one replicate
+				datasetIterationCount = 1;
 			}
+			
 
+			// Create a new dataset using our predictive and noise data, and save it to the appropriate directory
+			// Appropriate directory will match the quantile, dataset name, and the header
 			final int maxQuantileNumberLength = (new Integer(penetranceTableQuantiles.length)).toString().length();
+			
 			datasetIterationCount = dd.replicateCount.getInteger();
+			
 			final int maxDatasetNumberLength = (new Integer(datasetIterationCount)).toString().length();
+			
 			for (int whichQuantile = 0; whichQuantile < penetranceTableQuantiles.length; ++whichQuantile) {
 				final PenetranceTableQuantile q = penetranceTableQuantiles[whichQuantile];
+
 				String quantileName = (new Integer(whichQuantile + 1)).toString();
+
 				quantileName = "0000000000".substring(0, maxQuantileNumberLength - quantileName.length()) + quantileName;
+
+				// Make the subdirectory within your overarching directory that corresponds to your current dataset
 				if (destFilename != null) {
 					subdirectory = new File(directory, destFilename + "_EDM-" + quantileName);
 					subdirectory.mkdirs();
 				}
+				
+				// Determine the number of datasets you're supposed to output within this folder and save them there
 				for (int whichDataset = 0; whichDataset < datasetIterationCount; ++whichDataset) {
 					String datasetName = (new Integer(whichDataset + 1)).toString();
+
 					datasetName = "0000000000".substring(0, maxDatasetNumberLength - datasetName.length()) + datasetName;
+					
 					if (destFilename != null) {
 						datasetFile = new File(subdirectory, destFilename + "_EDM-" + quantileName + "_" + datasetName + ".txt");
 					} else {
 						datasetFile = null;
 					}
+					
 					final StringBuilder header = new StringBuilder();
-
+					
 					assert q.tables.length == document.modelFractions.length : "q.tables.length =! document.modelFractions.length";
 
-					SnpGenSimulator.generateAndSaveDataset(random, predictiveDataset, noiseDataset, q.tables, dd, false, datasetFile,
+					int[][] out = SnpGenSimulator.generateAndSaveDataset(random, predictiveDataset, noiseDataset, q.tables, dd, true, datasetFile,
 							header, document.modelFractions);
+					
 					if (inProgressHandler != null) {
 						inProgressHandler.setValue(++fileCount);
 					}
+
+					// Added by Vivek:
+					// If the heterogeneousLabelBoolean is selected, and we're actually creating heterogeneous data,
+					// and we have multiple models selected, then we'll call our function "addModelLabelToHeterogeneousOutput". This creates a new output file for each output file
+					// that has model labels as the first column
+					if(dd.heterogeneousLabelBoolean.toString().equals("true") && 
+					   dd.multipleModelDatasetType.toString().equals("heterogeneous") &&
+					   document.modelFractions.length > 1)
+						addModelLabelToHeterogeneousOutput(datasetFile.getAbsolutePath(), document.modelFractions);
 				}
 			}
 		}
 
-		// File caseControlFile = null;
-		// caseControlFile = new File(directory, dd.outputFile +
-		// "_caseControlValues.txt");
-		// if(penetranceTableQuantiles != null && caseControlFile != null)
-		// {
-		// boolean append = false;
-		// for(PenetranceTableQuantile q: penetranceTableQuantiles)
-		// {
-		// for(PenetranceTable table: q.tables)
-		// {
-		// table.saveCaseControlValuesToFile(caseControlFile, append);
-		// append = true;
-		// }
-		// }
-		// }
+		// If the previous code ran without throwing any errors, we can say we've finished creating our datasets
 		if (document.datasetList.size() > 0) {
 			System.out.println("Done generating datasets.");
 		}
@@ -241,6 +257,7 @@ public class SnpGenSimulator {
 
 	public PenetranceTable[] generatePenetranceTables(final DocModel model, final int inDesiredTableCount, final int inTryCount,
 			final ProgressHandler inProgressHandler, final int inProgressValueBase) throws Exception {
+		
 		return generatePenetranceTables(random, inDesiredTableCount, inTryCount, model.heritability.getDouble(), -1,
 				model.prevalence.getDouble(), model.attributeCount.getInteger(), model.getAttributeNames(), model.getAlleleFrequencies(),
 				model.getUseOddsRatio(), inProgressHandler, inProgressValueBase);
@@ -250,13 +267,11 @@ public class SnpGenSimulator {
 			final double inDesiredHeritability, final double inHeritabilityTolerance, final Double inDesiredPrevalence,
 			final int inAttributeCount, final String[] inAttributeNames, final double[] inAlleleFrequencies, final boolean inUseOddsRatio,
 			final ProgressHandler inProgressHandler, final int inProgressValueBase) throws Exception {
+		
 		PenetranceTable.ErrorState error;
 		PenetranceTable currentPenetranceTable;
 		final PenetranceTable.PenetranceTableComparatorEdm edmComparator = new PenetranceTable.PenetranceTableComparatorEdm();
 		final PenetranceTable.PenetranceTableComparatorOddsRatio oddsComparator = new PenetranceTable.PenetranceTableComparatorOddsRatio();
-
-		// double[] heritabilities = new double[inTablesToTryCount];
-		// int totalHeritabilityCount = 0;
 
 		final List<PenetranceTable> penetranceTableList = new ArrayList<PenetranceTable>();
 		PenetranceTable.fixedConflictSuccessfully = 0;
@@ -269,42 +284,15 @@ public class SnpGenSimulator {
 			currentPenetranceTable.initialize(inRandom, inAlleleFrequencies);
 			error = currentPenetranceTable.generateUnnormalized(inRandom);
 
-			// if (error == ErrorState.Ambiguous)
-			// {
-			// ++ambiguityCount;
-			// if(currentPenetranceTable.fixedConflict)
-			// ++ambiguousFixedConflictCount;
-			// }
-			// else if (error == ErrorState.Conflict)
-			// {
-			// ++conflictCount;
-			// if(currentPenetranceTable.fixedConflict)
-			// ++conflictedFixedConflictCount;
-			// }
-			// else
-			// {
-			// if(currentPenetranceTable.fixedConflict)
-			// ++successfulFixedConflictCount;
-			// }
-
 			if ((error == PenetranceTable.ErrorState.Ambiguous) || (error == PenetranceTable.ErrorState.Conflict)) {
 				// System.out.println("Failed to construct the penetrance table");
-			} else {
-				// PenetranceTable copy = null;
-				// try
-				// {
-				// copy = (PenetranceTable) currentPenetranceTable.clone();
-				// }
-				// catch(CloneNotSupportedException cnse)
-				// {
-				//
-				// }
-				// currentPenetranceTable.verify();
+			}
+			
+			// If we didn't fail to construct the penetrance table:
+			else {
 				currentPenetranceTable.scaleToUnitInterval();
 				currentPenetranceTable.adjustPrevalence();
-				// currentPenetranceTable.verify();
 				final double herit = currentPenetranceTable.calcHeritability();
-				// heritabilities[totalHeritabilityCount++] = herit;
 				boolean heritabilityAchieved = false;
 				if ((inHeritabilityTolerance < 0)
 						|| (Math.abs((herit - currentPenetranceTable.desiredHeritability) / currentPenetranceTable.desiredHeritability) < inHeritabilityTolerance)) {
@@ -314,44 +302,35 @@ public class SnpGenSimulator {
 				if (!heritabilityAchieved) {
 				} else {
 					currentPenetranceTable.checkRowSums();
-					// if(!currentPenetranceTable.rowSumsValid)
-					// throw new Exception("Table failed the row-sum test!");
 					if (currentPenetranceTable.rowSumsValid) {
 						penetranceTableList.add(currentPenetranceTable);
 					}
-					// if(inProgressHandler != null)
-					// inProgressHandler.setValue(whichModel *
-					// inDesiredTableCount + tableCountSoFar);
 
 					if (penetranceTableList.size() >= inDesiredTableCount) {
 						break;
 					}
 				}
 			}
+			
 			if (inProgressHandler != null) {
 				inProgressHandler.setValue(inProgressValueBase + whichTableIteration);
 			}
 		}
 
+		// Convert our list into an array
 		final PenetranceTable[] penetranceTables = penetranceTableList.toArray(new PenetranceTable[0]);
+		
+		// Sort the array either by odds ratio or EDM
 		if (inUseOddsRatio) {
 			Arrays.sort(penetranceTables, oddsComparator);
 		} else {
 			Arrays.sort(penetranceTables, edmComparator);
 		}
 
-		// System.out.println("fixedConflictSuccessfully: " +
-		// PenetranceTable.fixedConflictSuccessfully);
-		// System.out.println("fixedConflictUnsuccessfully: " +
-		// PenetranceTable.fixedConflictUnsuccessfully);
-		// heritabilities = Arrays.copyOf(heritabilities,
-		// totalHeritabilityCount);
-		// printStats(heritabilities, 20);
-		// System.out.print("\t");
-
 		return penetranceTables;
 	}
 
+	
 	public double[][] generateTablesForModels(final ArrayList<DocModel> modelList, final int desiredQuantileCount,
 			final int inDesiredPopulationCount, final int inTryCount, final ProgressHandler inProgressHandler) throws Exception {
 		final int modelCount = modelList.size();
@@ -366,20 +345,25 @@ public class SnpGenSimulator {
 			allTableScores[whichModel] = generateTablesForOneModel(model, desiredQuantileCount, inDesiredPopulationCount, inTryCount,
 					inProgressHandler, progressValueBase);
 		}
+		
 		if (modelCount > 0) {
 			System.out.println("Done generating models.");
 		}
+		
 		return allTableScores;
 	}
+	
 
 	public PenetranceTableQuantile[] getPenetranceTableQuantiles() {
 		return penetranceTableQuantiles;
 	}
+	
 
 	public int getTablePopulationCountFound() {
 		return tablePopulationCountFound;
 	}
 
+	
 	public PenetranceTableQuantile[] parseModelInputFile(final File inInputFile) throws FileNotFoundException, IOException, InputException {
 
 		final ArrayList<ArrayList<PenetranceTable>> tables = new ArrayList<>();
@@ -419,6 +403,7 @@ public class SnpGenSimulator {
 		}
 		return outPenetranceTableQuantiles;
 	}
+	
 
 	public PenetranceTableQuantile[] parseModelInputFiles(final File[] inInputFiles) throws FileNotFoundException, IOException,
 	InputException {
@@ -434,6 +419,7 @@ public class SnpGenSimulator {
 		}
 		return outQuantiles;
 	}
+	
 
 	public void setDocument(final SnpGenDocument inDoc) {
 		document = inDoc;
@@ -731,40 +717,6 @@ public class SnpGenSimulator {
 		}
 	}
 
-	// private void printStats(final Random inRandom, final double herit, final
-	// double inHeritabilityTolerance, final double ras,
-	// final double maf, final int inPopCount, final int inBucketCount, final
-	// int inWhichModel) throws Exception {
-	// int popCount = inPopCount;
-	// double[] scores = new double[popCount];
-	// PenetranceTable[] pop;
-	// pop = generatePenetranceTables(inRandom, popCount, 100 * popCount,
-	// (double) herit, inHeritabilityTolerance, null, 2, new String[] {
-	// "foo", "bar" }, new double[] { (double) maf, (double) maf }, false, null,
-	// 0);
-	// int scoreCount = 0;
-	// for (final PenetranceTable t : pop) {
-	// if (t == null) {
-	// popCount = scoreCount;
-	// break;
-	// }
-	// scores[scoreCount++] = t.edm;
-	// }
-	// if (popCount != inPopCount) {
-	// scores = Arrays.copyOf(scores, popCount);
-	// }
-	// Arrays.sort(scores);
-	// int whichScore = 0;
-	// while ((whichScore < popCount) && (scores[whichScore] < ras)) {
-	// ++whichScore;
-	// }
-	// final double percentile = (100 * (double) whichScore) / popCount;
-	// System.out.print(inWhichModel + "\t" + maf + "\t" + herit + "\t" + ras +
-	// "\t" + percentile + "\t");
-	// SnpGenSimulator.printStats(scores, inBucketCount);
-	// System.out.println();
-	// }
-
 	private void setRandomSeed(final Integer inSeed) {
 		SnpGenSimulator.setRandomSeed(random, inSeed);
 	}
@@ -818,20 +770,21 @@ public class SnpGenSimulator {
 			final PenetranceTable[] inTables, final DocDataset dd, final boolean inReturnDataset,
 			final File inDestFile,
 			final StringBuilder outHeader, final double[] modelFractions) throws Exception {
-		// int caseCount = inCaseCount.getInteger().intValue();
-		// int controlCount = inControlCount.getInteger().intValue();
 
+		// Based upon inTables, get the number of attributes
 		int attributeCountPredictiveFromTables = 0;
 		for (final PenetranceTable t : inTables) {
 			attributeCountPredictiveFromTables += t.attributeCount;
 		}
 
+		// Based upon the input predictive file, get the number of attributes
 		int attributeCountPredictiveFromFile = 0;
 		if (inPredictiveDataset != null) {
 			attributeCountPredictiveFromFile = inPredictiveDataset[0].length - 1; // The columns in inPredictiveDataset,
 			// not counting the class column
 		}
 
+		// Sum up the attribute counte from your table and files
 		final int predictiveAttributeCount = attributeCountPredictiveFromTables + attributeCountPredictiveFromFile;
 
 		int attributeCountNoiseFile = 0;
@@ -839,7 +792,7 @@ public class SnpGenSimulator {
 			attributeCountNoiseFile = inNoiseDataset[0].length;
 		}
 
-		int totalAttributeCount = dd.totalAttributeCount.getInteger().intValue();
+		int totalAttributeCount = dd.totalAttributeCount.getInteger().intValue();		
 		int attributeCountNoiseGenerated;
 
 		final int instanceCount = (inNoiseDataset != null) ? inNoiseDataset.length : dd.totalCount.getInteger().intValue();
@@ -857,6 +810,7 @@ public class SnpGenSimulator {
 			assert attributeCountNoiseFile == 0;
 		}
 
+		
 		final int noiseAttributeCount = attributeCountNoiseGenerated + attributeCountNoiseFile;
 		assert totalAttributeCount == (predictiveAttributeCount + noiseAttributeCount);
 
@@ -869,6 +823,10 @@ public class SnpGenSimulator {
 		int[][] outputArray = null;
 		if (inReturnDataset) {
 			outputArray = new int[dd.totalCount.getInteger().intValue()][totalAttributeCount + 1];
+			
+			// two extra columns; one for the classification and one for the contributing model
+			//outputArray = new int[dd.totalCount.getInteger().intValue()][totalAttributeCount + 2];
+
 		}
 
 		try (PrintWriter outputStream = (inDestFile == null) ? null : new PrintWriter(new FileWriter(inDestFile));) {
@@ -876,7 +834,7 @@ public class SnpGenSimulator {
 			// The order of attributes: non-predictive attributes, followed by
 			// predictive attributes from the file, followed by predictive
 			// attributes from the SNPGen models.
-
+			
 			// Header for non-predictive attributes:
 			for (int i = 0; i < noiseAttributeCount; ++i) {
 				if (outputStream != null) {
@@ -919,6 +877,8 @@ public class SnpGenSimulator {
 			final double[][] alleleFrequencies = new double[attributeCountNoiseGenerated][3];
 			final double alleleFrequencyMin = dd.alleleFrequencyMin.getDouble().doubleValue();
 			final double alleleFrequencyRange = dd.alleleFrequencyMax.getDouble().doubleValue() - alleleFrequencyMin;
+			
+			// Calculate the minor allele frequency for each of the noise attributes (N0, N1, etc.)
 			for (int i = 0; i < attributeCountNoiseGenerated; ++i) {
 				final double maf = (inRandom.nextDouble() * alleleFrequencyRange) + alleleFrequencyMin;
 				PenetranceTable.calcAlleleFrequencies(maf, alleleFrequencies[i]);
@@ -955,12 +915,15 @@ public class SnpGenSimulator {
 				SnpGenSimulator.printInstances(dd, inRandom, inPredictiveDataset, inNoiseDataset, 0, inTables,
 						attributeCountNoiseGenerated, alleleFrequencies, 1, dd.totalCount.getInteger(), genotypeIntervals, outputStream,
 						outputArray, 0, modelFractions);
-			} else {
+			} 
+			
+			else {
 				// Calculate the values of caseIntervals and controlIntervals, such
 				// that the length of each interval is the desired probability
 				// of a given case or control (respectively) landing in a given cell.
 				// This is used for sampling the cells in the dataset.
 				final int tableCount = inTables.length;
+				
 				caseIntervals = new double[tableCount][];
 				controlIntervals = new double[tableCount][];
 				for (int j = 0; j < tableCount; ++j) {
@@ -985,28 +948,28 @@ public class SnpGenSimulator {
 						controlIntervals[j][i] = sumControlFractions;
 					}
 					assert Math.abs((sumCaseFractions + sumControlFractions) - 1.0) < SnpGenSimulator.kErrorLimit;
-					// Divide each element of caseIntervals and controlIntervals
-					// by the appropriate total sum.
+					// Divide each element of caseIntervals and controlIntervals by the appropriate total sum.
 					for (int i = 0; i < inTables[j].cellCount; ++i) {
 						caseIntervals[j][i] /= sumCaseFractions;
 						controlIntervals[j][i] /= sumControlFractions;
 					}
 				}
-				// Now, the length of the interval from caseIntervals[i-1] to
-				// caseIntervals[i]
-				// == the probability that a random case is in the ith cell of
-				// the penetrance table; similarly for controls.
+				
+				// Now, the length of the interval from caseIntervals[i-1] to caseIntervals[i] == the probability that
+				// a random case is in the ith cell of the penetrance table; similarly for controls.
 
 				for (int j = 0; j < tableCount; ++j) {
 					inTables[j].clear();
 				}
 				final int caseCount = (int) Math.round(dd.caseProportion.value * instanceCount);
 				final int controlCount = instanceCount - caseCount;
+				
 				// write out all the cases
 				SnpGenSimulator.printInstances(dd, inRandom, inPredictiveDataset, inNoiseDataset, 0, inTables,
 						attributeCountNoiseGenerated,
 						alleleFrequencies, 1, caseCount, caseIntervals, outputStream, outputArray, 0,
 						modelFractions);
+				
 				// write out all the controls
 				SnpGenSimulator.printInstances(dd, inRandom, inPredictiveDataset, inNoiseDataset, caseCount, inTables,
 						attributeCountNoiseGenerated, alleleFrequencies, 0, controlCount, controlIntervals, outputStream, outputArray,
@@ -1081,15 +1044,16 @@ public class SnpGenSimulator {
 		// For each instance desired:
 		assert modelFractions.length == inTables.length;
 		double sumTableFractions = 0;
+		// modelFraction is the contribution coming from each model
 		for (final double modelFraction : modelFractions) {
+			//System.out.println("modelFraction is " + modelFraction);
 			sumTableFractions += modelFraction;
 		}
 		
+		// sumTableFractions should be 1
 		assert Math.abs(sumTableFractions - 1.0d) < 0.00001d : "sum of model weights should be 1 but is: " + sumTableFractions
 		+ " table weights: " + Arrays.toString(modelFractions);
-		
-		System.out.println("Current multiple model type is " + dd.multipleModelDatasetType.getValue() + ", line 1091");
-		
+				
 		// Iterate over each row
 		for (int row = 0; row < inInstanceCount; ++row) {
 			Integer heterogeneousCurrentTable = null;
@@ -1098,11 +1062,20 @@ public class SnpGenSimulator {
 				// System.out.println("Current multipleModelDatasetType is heterogenenous, line 1094");
 				
 				// Figure out which table has the signal for the current row:
+				
+				// Determine what proportion of the rows we've gone through so far
 				final double rowFraction = (double) row / inInstanceCount;
+				
 				double tableFractionBefore = 0;
 				// slight doubling-point discrepancies.
 				for (int k = 0; k < inTables.length; ++k) {
+					// Consider two tables, each contributing .5 in heterogeneity
+					// We determine the first table has contribution .5
 					final double currentTableFraction = modelFractions[k];
+					//System.out.println("currentTableFraction is " + currentTableFraction);
+					// If the current row we're looking at is less than .0 + .5, it goes to the first model
+					// When we iterate over to the nextt able, currentTalbe fraction will be 0.5. So then,
+					// if the row fraction is less than 1, it goes to the second model
 					if (rowFraction < (tableFractionBefore + currentTableFraction)) {
 						heterogeneousCurrentTable = k;
 						break;
@@ -1112,6 +1085,7 @@ public class SnpGenSimulator {
 			}
 			
 			
+			// destWhich tells us the column to add to
 			int destWhich = 0;
 			if (inNoiseDataset != null) {
 				// Copy the noise attributes from inNoiseDataset
@@ -1126,8 +1100,7 @@ public class SnpGenSimulator {
 				++whichNoise;
 			}
 
-			// Generate noise attributes
-			// System.out.println("Generating random noise attributes, line 1126");
+			// Edit output stream based upon noise
 			for (int j = 0; j < inNoiseAttributeCount; ++j) {
 				SnpGenSimulator.noiseToOutput(inRandom, inAlleleFrequencies[j], inOutputStream, inOutputArray,
 						whichOutputLine, destWhich++);
@@ -1166,16 +1139,13 @@ public class SnpGenSimulator {
 			double phenotypeValue = 0.0;
 			
 			// Generate values for each of the model columns
-			//System.out.println("inTables.length is " + inTables.length);
 			for (int whichTable = 0; whichTable < inTables.length; ++whichTable) {
 				final PenetranceTable table = inTables[whichTable];
 				cellId = new PenetranceTable.CellId(table.attributeCount);
 
 				// Do we need to use the model's penetrance or is the model being skipped due to heterogeneity?
 				if ((dd.multipleModelDatasetType.getValue() == SnpGenDocument.MIXED_MODEL_DATASET_TYPE.heterogeneous) && (whichTable != heterogeneousCurrentTable)) {
-					// The current table is not the signal table, so generate noise:
-					// System.out.println("Generating data for the next heterogeneous table, line 1172");
-					
+					// The current table is not the signal table, so generate noise:					
 					for (int j = 0; j < table.attributeCount; ++j) {
 						table.getAlleleFrequencies(j, alleleFrequencies);
 						final int whichValue = SnpGenSimulator.noiseToOutput(inRandom, alleleFrequencies, inOutputStream, inOutputArray,
@@ -1260,162 +1230,156 @@ public class SnpGenSimulator {
 			++whichOutputLine;
 		}
 
-		// // Output for testing:
-		// if(inInstanceClass == 0)
-		// {
-		// NumberFormat nf = NumberFormat.getInstance();
-		// nf.setMaximumFractionDigits(4);
-		// for(int whichTable = 0; whichTable < inTables.length; ++whichTable)
-		// {
-		// PenetranceTable table = inTables[whichTable];
-		// System.out.println("Table " + whichTable + ", penetrances");
-		// for(int j = 0; j < 3; ++j)
-		// {
-		// for(int k = 0; k < 3; ++k)
-		// {
-		// System.out.print(nf.format(table.cells[3 * j + k].getValue()) +
-		// "\t");
-		// }
-		// System.out.println();
-		// }
-		// System.out.println();
-		// System.out.println("Table " + whichTable + ", allele frequencies");
-		// double[] alleleFrequencies0 = new double[3];
-		// double[] alleleFrequencies1 = new double[3];
-		// table.getAlleleFrequencies(0, alleleFrequencies0);
-		// table.getAlleleFrequencies(1, alleleFrequencies1);
-		// for(int j = 0; j < 3; ++j)
-		// {
-		// for(int k = 0; k < 3; ++k)
-		// {
-		// System.out.print(nf.format(alleleFrequencies0[j] *
-		// alleleFrequencies1[k]) + "\t");
-		// }
-		// System.out.println();
-		// }
-		// System.out.println();
-		// System.out.println("Table " + whichTable + ", case-counts");
-		// for(int j = 0; j < 3; ++j)
-		// {
-		// for(int k = 0; k < 3; ++k)
-		// {
-		// System.out.print(table.cellCaseCount[3 * j + k] + "\t");
-		// }
-		// System.out.println();
-		// }
-		// System.out.println();
-		// System.out.println("Table " + whichTable + ", control-counts");
-		// for(int j = 0; j < 3; ++j)
-		// {
-		// for(int k = 0; k < 3; ++k)
-		// {
-		// System.out.print(table.cellControlCount[3 * j + k] + "\t");
-		// }
-		// System.out.println();
-		// }
-		// System.out.println();
-		// System.out.println();
-		// }
-		// }
 	}
 
-	// public void calcStatsForStdModels(SnpGenDocument inDoc) throws Exception
-	// {
-	// if(inDoc.inputFile != null)
-	// {
-	// Random random = createRandom(inDoc.randomSeed);
-	// int popCount = 1000;
-	// int bucketCount = 100;
-	//
-	// printStats(random, 0.02, 0.05F, 0.01, 0.2, popCount, bucketCount, -1);
-	// printStats(random, 0.02, 0.05F, 0.01, 0.2, popCount, bucketCount, -1);
-	// printStats(random, 0.02, 0.05F, 0.01, 0.2, popCount, bucketCount, -1);
-	// printStats(random, 0.02, -1, 0.01, 0.2, popCount, bucketCount, -1);
-	// printStats(random, 0.02, -1, 0.01, 0.2, popCount, bucketCount, -1);
-	// printStats(random, 0.02, -1, 0.01, 0.2, popCount, bucketCount, -1);
-	//
-	// printStats(random, 0.1, 0.05F, 0.01, 0.4, popCount, bucketCount, -1);
-	// printStats(random, 0.1, 0.05F, 0.01, 0.4, popCount, bucketCount, -1);
-	// printStats(random, 0.1, 0.05F, 0.01, 0.4, popCount, bucketCount, -1);
-	// printStats(random, 0.1, -1, 0.01, 0.4, popCount, bucketCount, -1);
-	// printStats(random, 0.1, -1, 0.01, 0.4, popCount, bucketCount, -1);
-	// printStats(random, 0.1, -1, 0.01, 0.4, popCount, bucketCount, -1);
-	//
-	// PenetranceTable[] tables = parseStandardTables(inDoc.inputFile);
-	// int whichModel = 0;
-	// System.out.println("Model #\tMAF\tHeritability\tRAS\tRAS percentile\tMinimum RAS\tMaximum RAS\tMean RAS\tStd Dev RAS\tBucket-counts");
-	// for(PenetranceTable t: tables)
-	// {
-	// // Generate the distribution twice, to see whether there's any
-	// significant variation:
-	// printStats(random, t, popCount, bucketCount, whichModel);
-	// printStats(random, t, popCount, bucketCount, whichModel);
-	// ++whichModel;
-	// }
-	// }
-	// }
-
-	// private static void printStats(final double[] scores, final int
-	// inBucketCount) {
-	// final NumberFormat f = NumberFormat.getInstance();
-	// f.setMaximumFractionDigits(2);
-	// Arrays.sort(scores);
-	// final int scoreCount = scores.length;
-	// double sum = 0;
-	// double sumOfSquares = 0;
-	// for (final double d : scores) {
-	// sum += d;
-	// sumOfSquares += d * d;
-	// }
-	// final double mean = sum / scoreCount;
-	// System.out.print("\t" + scoreCount + "\t" + scores[0] + "\t" +
-	// scores[scoreCount - 1] + "\t" + mean + "\t"
-	// + Math.sqrt((sumOfSquares / scoreCount) - (mean * mean)));
-	// int whichScore = 0;
-	// final double bucketWidth = (scores[scoreCount - 1] - scores[0]) /
-	// inBucketCount;
-	// int bucketCount;
-	// int bucketCountSoFar = 0;
-	// double bucketRight;
-	// // System.out.println("\t" + scores[0] + "\t" + scores[inPopCount - 1]);
-	// for (int i = 1; i < inBucketCount; ++i) // Don't count the last bucket,
-	// // assume it's whatever's left
-	// // at the end
-	// {
-	// bucketRight = scores[0] + (i * bucketWidth);
-	// bucketCount = 0;
-	// while (scores[whichScore] <= bucketRight) {
-	// ++bucketCount;
-	// ++whichScore;
-	// }
-	// // Now, whichScore is the first score past the current bucket
-	// bucketCountSoFar += bucketCount;
-	// System.out.print("\t" + f.format((100 * (double) bucketCount) /
-	// scoreCount));
-	// }
-	// bucketCount = scoreCount - bucketCountSoFar;
-	// System.out.print("\t" + f.format((100 * (double) bucketCount) /
-	// scoreCount));
-	// }
-	//
+	
 	private static void setRandomSeed(final Random inRandom, final Integer inSeed) {
 		if (inSeed != null) {
 			inRandom.setSeed(inSeed);
 		}
 	}
 
+	// Edit the output stream
 	private static void valueToOutput(final int inValue, final String inValueString, final PrintWriter inOutputStream,
 			final boolean inTabAfter, final int[][] inOutputArray, final int inWhichOutputLine, final int inWhichOutputColumn) {
+		
 		if (inOutputStream != null) {
 			inOutputStream.print((inValueString != null) ? inValueString : inValue);
 			if (inTabAfter) {
 				inOutputStream.print("\t");
 			}
 		}
+		
 		if (inOutputArray != null) {
 			inOutputArray[inWhichOutputLine][inWhichOutputColumn] = inValue;
 		}
 	}
+	
+	// Added by Vivek; trying to add a model label column to an output file for heterogeneous data
+	// Function to read output from GAMETES into a 2D array
+	private static String[][] readIn2DTableFromText(final String destFile) throws Exception{
+		// Determine the number of lines in a file, as well as the length of a single line
+		int numRows = 0; int numColumns = 0;
+		BufferedReader reader = new BufferedReader(new FileReader(destFile));
+		String line = reader.readLine();
+		while (line != null){
+			if(numRows == 0)
+				numColumns = line.split("\t").length;
+			numRows++;
+			line = reader.readLine();
+		}	
+		reader.close();	
+
+		// Define a 2D array with the appropriate number of elements
+		String[][] array = new String[numRows][numColumns];
+
+		// Read through the file again and save out individual elements to our output array
+		int index = 0;
+		reader = new BufferedReader(new FileReader(destFile));
+		line = reader.readLine();
+		while(line != null){
+			// Determine what the line is
+			String[] currentRowArray = line.split("\t");
+
+			// Set the current row of the outupt array to be the line
+			for(int currRowIndex = 0; currRowIndex < currentRowArray.length; currRowIndex++)
+				array[index][currRowIndex] = currentRowArray[currRowIndex];
+
+			// Iterate to next index / line in the file
+			index++;
+			line = reader.readLine();
+		}
+		reader.close();
+
+		// Return the array that's been read in
+		return array;
+	}
+
+
+	// Added by Vivek; trying to add a model label column to an output file for heterogeneous data
+	// Function to add a model label column to an output file for heterogeneous data
+	private static String[][] addModelLabelToHeterogeneousOutput(final String destFile, double[] modelProportions) throws Exception{
+		// Get the outputArray from the destFile filepath
+		String[][] outputArray = readIn2DTableFromText(destFile);
+
+		// firstColumn array will be same length as number of rows in our array of values		
+		String[] firstColumn = new String[outputArray.length];
+
+		// Normalize the model proportions input
+		// I.e., from the UI, model proportions will be [1.0, 1.0], but we want it to be [0.5, 0.5]
+		double sumOfProps = 0.0;
+		for(int propIndex = 0; propIndex < modelProportions.length; propIndex++)
+			sumOfProps += modelProportions[propIndex];
+		double[] normalizedModelProps = new double[modelProportions.length];
+		for(int propIndex = 0; propIndex < normalizedModelProps.length; propIndex++)
+			normalizedModelProps[propIndex] = modelProportions[propIndex]/sumOfProps;
+		
+		// Convert the normalized model proportions into a cumulative distribution
+		// I.e., if we have [0.3, 0.3, 0.4], we want to make it [0.3, 0.6, 1.0]
+		double[] cumulativeModelProportions = new double[normalizedModelProps.length];
+		double totalSum = 0.0;
+		for(int i = 0; i < normalizedModelProps.length; i++) {
+			cumulativeModelProportions[i] = normalizedModelProps[i] + totalSum;
+			totalSum = totalSum + normalizedModelProps[i];
+		}
+			
+		// Iterate over each row in our output array to determine the values of our new first column	
+		for(int rowNum = 1; rowNum < outputArray.length; rowNum++) {
+			// Calculate the current row proportion; make sure to subtract 1 from everything to ignore the header row
+			double currentRowProportion = (double)(rowNum-1)/(outputArray.length-1);
+
+			// Initialize the model number for the row; set it to -1 so that if our function fails, we're able to tell
+			int desiredModelPropIndex = -1;
+			
+			// Look at each row's currentRowProportion, and make sure it is as high as possible in the modelProportions array
+			for(int modelProportionsIndex = 0; modelProportionsIndex < cumulativeModelProportions.length; modelProportionsIndex++){
+				// If the row's current proportion is less than the model proportion, then we're good
+				if(currentRowProportion < cumulativeModelProportions[modelProportionsIndex]){
+					desiredModelPropIndex = modelProportionsIndex;
+					break;
+				}
+			}
+
+			// Set the appropriate value in our first column
+			String currentRowsModel = "Model_" + Integer.toString(desiredModelPropIndex);
+			firstColumn[rowNum] = currentRowsModel;
+		}
+
+		// Make sure to set the header of our new column to be "Model"
+		firstColumn[0] = "Model";
+			
+		// Get the dimensions of outputArray
+		int numRows = outputArray.length; int numCols = outputArray[0].length;
+			
+		// Define a newoutputArray that has the same number of rows, and then one more column
+		String[][] newOutputArray = new String[numRows][numCols+1];
+		
+		// Set the first column of newOutputArray to be the first column we calculated earlier
+		for(int rowIndex = 0; rowIndex < numRows; rowIndex++)
+			newOutputArray[rowIndex][0] = firstColumn[rowIndex];
+
+		// Set the rest of newOutputArray to be outputArray
+		for(int rowIndex = 0; rowIndex < numRows; rowIndex++){
+			for(int colIndex = 0; colIndex < numCols; colIndex++){
+		 		newOutputArray[rowIndex][colIndex+1] = String.valueOf(outputArray[rowIndex][colIndex]);
+			}
+		}
+
+		// Write the newOutputArray to the destFile path
+		String destFileForWriting = destFile.substring(0, destFile.length() -  4) + "_hetLabel.txt";
+        FileWriter writer = new FileWriter(destFileForWriting, false);
+        for (int i = 0; i < newOutputArray.length; i++) {
+            for (int j = 0; j < newOutputArray[i].length; j++)
+             	writer.write(newOutputArray[i][j]+ "\t");
+
+            writer.write("\n");   // write new line
+        }
+        writer.close();
+
+		// Return the new array as final output
+		return newOutputArray;	
+	}
+	
 
 	public static class PenetranceTableQuantile {
 		public PenetranceTable[] tables;

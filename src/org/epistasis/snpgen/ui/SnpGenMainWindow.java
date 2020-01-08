@@ -79,6 +79,8 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
     JButton generateButton;
     JRadioButton additiveButton;
     JRadioButton heteroButton;
+    JCheckBox heteroLabelsCheckbox; 
+    boolean activate;
     public EndpointTypePanel endpointTypePanel = null;
 
     public SnpGenMainWindow(final SnpGenDocument inSnpGenDocument) {
@@ -184,8 +186,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
     }
 
     // WARNING: If you change the relationship of inClass to the class of the
-    // output JComponent,
-    // be sure to update the createBacked<whatever> methods above.
+    // output JComponent, be sure to update the createBacked<whatever> methods above.
     protected JComponent addComponent(final Class<?> inClass, final Container inContainer,
             final DocMember<?> inBackingField, final int inColumnCount, final String inLabel) {
         JComponent outComp = null;
@@ -203,9 +204,8 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         return SnpGenMainWindow.addComponent(outComp, inClass, inContainer, inColumnCount, inLabel);
     }
 
-    // // WARNING: If you change the relationship of inClass to the class of the
-    // // output JComponent,
-    // // be sure to update the createBacked<whatever> methods above.
+    // WARNING: If you change the relationship of inClass to the class of the
+    // output JComponent, be sure to update the createBacked<whatever> methods above.
 
     private BackedCheckBox addBackedBoolean(final Container inContainer, final DocBoolean inBackingField,
             final int inColumnCount, final String inLabel) {
@@ -263,8 +263,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
     }
 
     /**
-     * Create the GUI and show it. For thread safety, this method should be invoked
-     * from the event-dispatching thread.
+     * Create the GUI and show it. For thread safety, this method should be invoked from the event-dispatching thread.
      */
     private void createAndShowGUI() {
         try {
@@ -473,7 +472,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         final int modelNumber = nextModelNumber++;
         final GenerateModelDialog modelDialog = new GenerateModelDialog(frame, modelNumber,
                 document.getNextPredictiveAttributeNumber());
-        // // Since the new model will replace the old one, the new model's
+        // Since the new model will replace the old one, the new model's
         // predictive attribute names should always start at 1:
         // GenerateModelDialog modelDialog = new GenerateModelDialog(frame,
         // getDocument().getNextModelNumber(), 1);
@@ -558,8 +557,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
     }
 
-    // If all of the selected models have the same quantile-count then return
-    // that number, else return null.
+    // If all of the selected models have the same quantile-count then return that number, else return null.
     private Integer getCommonQuantileCount() {
         Integer quantileCount = null;
         final ArrayList<SnpGenDocument.DocModel> models = getSelectedModels();
@@ -580,8 +578,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         return documentLink.getDocument();
     }
 
-    // If all of the selected models have the same quantile-count then return
-    // that number, else return null.
+    // If all of the selected models have the same quantile-count then return that number, else return null.
     private ArrayList<SnpGenDocument.DocModel> getSelectedModels() {
         final ArrayList<SnpGenDocument.DocModel> outModels = new ArrayList<SnpGenDocument.DocModel>();
         final int[] selections = modelTable.getWhichSelectedModels();
@@ -627,7 +624,6 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
 
     private void loadModelFile() {
         try {
-            // final JFileChooser fileChooser = new JFileChooser();
             final int returnVal = fileChooser.showOpenDialog(frame);
             if (returnVal == JFileChooser.APPROVE_OPTION) {
                 final File inputFile = fileChooser.getSelectedFile();
@@ -661,8 +657,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
     private void removeSnpModel() {
         final SnpGenDocument document = getDocument();
         final int[] selections = modelTable.getWhichSelectedModels();
-        // Iterate the models from the end, because otherwise each model we
-        // remove will screw up whichModel:
+        // Iterate the models from the end, because otherwise each model we remove will screw up whichModel:
         for (int i = selections.length - 1; i >= 0; --i) {
             final int whichModel = selections[i];
             modelTable.setSelected(whichModel, false);
@@ -725,6 +720,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             } else {
                 additiveButton.setEnabled(false);
                 heteroButton.setEnabled(false);
+                
                 editEnabled = true; // first guess
                 final SnpGenDocument.DocModel model = document.getModel(selections[0]);
                 final Integer attributeCount = model.attributeCount.getInteger();
@@ -737,6 +733,8 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
                 }
             }
             editButton.setEnabled(editEnabled);
+            activate = true;
+            
         }
     }
 
@@ -766,7 +764,6 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
         
         final boolean runDocument = doc.runDocument;
-        System.out.println("doc is " + doc);
         
         if (showGui) {
             System.out.println("Going into GUI!");
@@ -781,16 +778,14 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
     }
 
     // WARNING: If you change the relationship of inClass to the class of the
-    // output JComponent,
-    // be sure to update the createBacked<whatever> methods above.
+    // output JComponent, be sure to update the createBacked<whatever> methods above.
     static protected JComponent addComponent(final Class<?> inClass, final Container inContainer,
             final int inColumnCount, final String inLabel) {
         return SnpGenMainWindow.addComponent(null, inClass, inContainer, inColumnCount, inLabel);
     }
 
     // WARNING: If you change the relationship of inClass to the class of the
-    // output JComponent,
-    // be sure to update the createBacked<whatever> methods above.
+    // output JComponent, be sure to update the createBacked<whatever> methods above.
     static protected JComponent addComponent(final JComponent inComp, final Class<?> inClass,
             final Container inContainer, final int inColumnCount, final String inLabel) {
         JLabel label = null;
@@ -1099,13 +1094,14 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         JRadioButton binaryClassButton;
         JRadioButton quantitativeTraitButton;
         
-        // Initialize the panels corresponding to binary and quantitative data
+        // Initialize the panels that correspond to binary and quantitative data
         final CardLayout binaryCardLayout = new CardLayout();
         final JPanel binaryCards = new JPanel(binaryCardLayout);
         FixedSampleNumberCaseControlPanel fixedSampleNumberCaseControlPanel;
         CaseControlPanel caseControlPanel;
         QuantitativePanel quantitativePanel;
 
+        // Define the endpoint type panel
         public EndpointTypePanel() {
             // Define our border and its layout, corresponding to the dataset properties
             setBorder(BorderFactory.createTitledBorder("Dataset Properties"));
@@ -1118,7 +1114,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             // Define panel corresponding to choices for additive data vs heterogeneous data
             JPanel comboDataButtonChoicesPanel;
             comboDataButtonChoicesPanel = new JPanel();
-
+            
             // Create the binary class/quantitative trait buttons
             binaryClassButton = new JRadioButton("Binary Class");
             quantitativeTraitButton = new JRadioButton("Quantitative Trait");
@@ -1129,17 +1125,18 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             // Create the additive and hetero data radio buttons
             additiveButton = new JRadioButton("Additive Data");
             heteroButton = new JRadioButton("Heterogenous Data");
-            //additiveButton.setSelected(true);
+            heteroLabelsCheckbox = new JCheckBox("Add model labels for Heterogeneous Data"); 
             additiveButton.setSelected(true);
             additiveButton.setEnabled(false);
             heteroButton.setEnabled(false);
+            heteroLabelsCheckbox.setEnabled(false);
             
-            // Group the endPoint radio buttons
+            // Group the endPoint radio buttons together
             final ButtonGroup endPointGroup = new ButtonGroup();
             endPointGroup.add(binaryClassButton);
             endPointGroup.add(quantitativeTraitButton);
             
-            // Group the comboData radio buttons
+            // Group the comboData radio buttons together
             final ButtonGroup comboDataGroup = new ButtonGroup();
             comboDataGroup.add(additiveButton);
             comboDataGroup.add(heteroButton);
@@ -1149,6 +1146,8 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             endPointButtonChoicesPanel.add(quantitativeTraitButton, BorderLayout.EAST);
             comboDataButtonChoicesPanel.add(additiveButton, BorderLayout.WEST);
             comboDataButtonChoicesPanel.add(heteroButton, BorderLayout.EAST);
+            comboDataButtonChoicesPanel.add(heteroLabelsCheckbox, BorderLayout.SOUTH);
+            
             add(comboDataButtonChoicesPanel, BorderLayout.CENTER);
             add(endPointButtonChoicesPanel, BorderLayout.CENTER);
             
@@ -1172,7 +1171,6 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             endpointTypeCards.add(quantitativePanel, SnpGenMainWindow.ENDPOINT_TYPES.QUANTITATIVE_TRAIT.toString());
             add(endpointTypeCards, BorderLayout.SOUTH);
 
-            
             // Register listeners for the radio buttons          
             // Include an ActionListener to report the output from the binaryClass button
             binaryClassButton.addActionListener(new ActionListener() {
@@ -1180,7 +1178,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
                 public void actionPerformed(final ActionEvent e) {
                     // If the binary class button is picked, show the relevant values and update the GUI based upon the
                     //    current data
-                    System.out.println("Based upon the UI, we doing binary");
+                    // System.out.println("Based upon the UI, we're doing binary");
                     endpointCardLayout.show(endpointTypeCards, SnpGenMainWindow.ENDPOINT_TYPES.BINARY_CLASS.toString());
                     getDocument().firstDataset.createContinuousEndpoints.setValue(Boolean.FALSE);
                     fixedSampleNumberCaseControlPanel.updateGuiToData();
@@ -1203,7 +1201,8 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             heteroButton.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(final ActionEvent e) {
-                    System.out.println("Based upon the UI, multipleModelType should be heterogeneous");
+                    // System.out.println("Based upon the UI, multipleModelType should be heterogeneous");
+                    heteroLabelsCheckbox.setEnabled(true);                    
                     getDocument().firstDataset.multipleModelDatasetType.setValue(MIXED_MODEL_DATASET_TYPE.heterogeneous);
                 }
             });
@@ -1212,8 +1211,26 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             additiveButton.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(final ActionEvent e) {
-                    System.out.println("Based upon the UI, multipleModelType should be additive/hierarchical");
+                    // System.out.println("Based upon the UI, multipleModelType should be additive/hierarchical");
+                    heteroLabelsCheckbox.setEnabled(false);                    
                     getDocument().firstDataset.multipleModelDatasetType.setValue(MIXED_MODEL_DATASET_TYPE.hierarchical);
+                }
+            });
+            
+            // Adding hetero checkbox
+            heteroLabelsCheckbox.addActionListener(new ActionListener() {
+            	@Override
+                public void actionPerformed(final ActionEvent e) {
+                    // System.out.println("Based upon the UI, we want to print model types for heterogeneous models");
+            		
+            		// Use the "activate" boolean to make sure the checkbox can be turned on or off
+            		if(activate) {
+                        getDocument().firstDataset.heterogeneousLabelBoolean.setValue(Boolean.TRUE);
+                        activate = false;
+            		} else {
+            			getDocument().firstDataset.heterogeneousLabelBoolean.setValue(Boolean.FALSE);
+                        activate = true;
+            		}
                 }
             });
         }
@@ -1230,7 +1247,6 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             quantitativePanel.updateGuiToData();
         }
     }
-    // END HERE
 
     public class FixedSampleNumberCaseControlPanel extends JPanel {
         private static final long serialVersionUID = 1L;
@@ -1253,10 +1269,9 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
                 }
             });
             
-            caseProportionField = addBackedLabel(this, getDocument().firstDataset.caseProportion, 3,
-                    "Case proportion:");
-            caseCountField = addBackedLabel(this, new DocInteger(), 3, "Number of cases:"); // The
-            controlCountField = addBackedLabel(this, new DocInteger(), 3, "Number of controls:"); // The
+            caseProportionField = addBackedLabel(this, getDocument().firstDataset.caseProportion, 3, "Case proportion:");
+            caseCountField = addBackedLabel(this, new DocInteger(), 3, "Number of cases:");
+            controlCountField = addBackedLabel(this, new DocInteger(), 3, "Number of controls:");
             proportionSlider.setValue((int) (SnpGenDocument.kDefaultDatasetCaseProportion * 100));
         }
 
@@ -1348,15 +1363,11 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             final JLabel alleleFrequencyLabel = new JLabel("Minor-allele-frequency range");
             alleleFrequencyLabel.setOpaque(true);
             mafPanel.add(alleleFrequencyLabel, BorderLayout.WEST);
-            field = addBackedDouble(mafPanel, getDocument().firstDataset.alleleFrequencyMin, 3, null); // The
-            // minimum
-            // allele
-            // frequency
+            // Minimum allele frequency
+            field = addBackedDouble(mafPanel, getDocument().firstDataset.alleleFrequencyMin, 3, null);
             field.setText(SnpGenDocument.kDefaultFrequencyMin.toString());
-            field = addBackedDouble(mafPanel, getDocument().firstDataset.alleleFrequencyMax, 3, null); // The
-            // maximum
-            // allele
-            // frequency
+            // Maximum allele frequency
+            field = addBackedDouble(mafPanel, getDocument().firstDataset.alleleFrequencyMax, 3, null);
             field.setText(SnpGenDocument.kDefaultFrequencyMax.toString());
             add(mafPanel, BorderLayout.EAST);
         }
@@ -1372,9 +1383,6 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         public NoiseReader() {
             getDocument();
 
-            // setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-            // add(new SnpFileLoader(SnpGenMainWindow.this));
-            // setBorder(BorderFactory.createTitledBorder("Input file"));
             setAlignmentY(Component.TOP_ALIGNMENT);
             setLayout(new BoxLayout(this, BoxLayout.X_AXIS));
 
@@ -1386,7 +1394,6 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
                     "Number of attributes:"); // The total number of attributes
             instanceCountLabel = (JLabel) SnpGenMainWindow.addComponent(JLabel.class, this, 0,
                     "Total number of instances:"); // The total number of instances
-            // reset();
         }
 
         public void reset() {
@@ -1502,9 +1509,8 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             add(reader);
         }
 
-        // Given the input from "Read from file" vs. "Generate"
-        //    in the Non-predictive Attributes, section, perform a certain action!
-        // The input is "ActionEvent e"
+        // Given the input from "Read from file" vs. "Generate" in the Non-predictive Attributes section,
+        //      perform a certain action. The input is "ActionEvent e"
         @Override
         public void actionPerformed(final ActionEvent e) {
             // If e correspond to "generate", then show the required info
@@ -1527,7 +1533,6 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             endpointTypePanel.updateGuiToData();
             updateSelection();
         }
-
     }
 
     public static class OpenAction extends SnpGenAction {

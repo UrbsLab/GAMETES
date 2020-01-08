@@ -32,14 +32,12 @@ public class SnpGenDocument {
 	public static final DecimalFormat kDecimalFormatFourDecimals = new DecimalFormat("#.####");
 	public static final DecimalFormat kDecimalFormatTenDecimals = new DecimalFormat("#.##########");
 	private static final String kDefaultAttributeNameBase = "P";
-	//private static final MIXED_MODEL_DATASET_TYPE kDefaultMultipleModelDatasetType = MIXED_MODEL_DATASET_TYPE.heterogeneous;
 	private static final MIXED_MODEL_DATASET_TYPE kDefaultMultipleModelDatasetType = MIXED_MODEL_DATASET_TYPE.hierarchical;
+	private static final Boolean kDefaultHeterogeneousLabelBoolean = Boolean.FALSE;
 
 
 	private int nextModelNumber;
 	private final ArrayList<DocListener> listeners;
-	
-
 
 	public double[] modelFractions = null;
 
@@ -308,7 +306,11 @@ public class SnpGenDocument {
 							+ MIXED_MODEL_DATASET_TYPE.hierarchical, MIXED_MODEL_DATASET_TYPE.class);
 
 			final Option<MIXED_MODEL_DATASET_TYPE> multipleModelDatasetType = datasetParserTemplate.addOption(heterogeneousOptionLocal);
-
+			
+			
+			final Option<Boolean> heterogeneousLabelBoolean = datasetParserTemplate.addBooleanOption('b', "heteroLabel", 
+					"Produce output datasets that include model labels in addition to normal outupt when working with heterogeneous data.");
+			
 			final Option<Double> continuousEndpointsStandardDeviationOption = datasetParserTemplate
 					.addDoubleOption(
 							'd',
@@ -431,6 +433,9 @@ public class SnpGenDocument {
 
 				dataset.multipleModelDatasetType.setValue(datasetParser.getOptionValue(multipleModelDatasetType),
 						SnpGenDocument.kDefaultMultipleModelDatasetType);
+				
+				dataset.heterogeneousLabelBoolean.setValue(datasetParser.getOptionValue(heterogeneousLabelBoolean),
+						SnpGenDocument.kDefaultHeterogeneousLabelBoolean);
 
 				final boolean continuousEndpoints = dataset.createContinuousEndpoints.getBoolean().booleanValue();
 				final Integer totalCount = datasetParser.getOptionValue(totalCountOption);
@@ -713,6 +718,7 @@ public class SnpGenDocument {
 		public DocDouble continuousEndpointsStandardDeviation;
 		public DocInteger totalCount;
 		public DocMIXED_MODEL_DATASET_TYPE multipleModelDatasetType;
+		public DocBoolean heterogeneousLabelBoolean;
 
 		public DocDataset(final SnpGenDocument inDoc) {
 			alleleFrequencyMin = new DocDouble(SnpGenDocument.kDefaultFrequencyMin);
@@ -725,6 +731,7 @@ public class SnpGenDocument {
 			createContinuousEndpoints = new DocBoolean(Boolean.FALSE);
 			continuousEndpointsStandardDeviation = new DocDouble(SnpGenDocument.kDefaultContinuousEndpointsStandardDeviation);
 			multipleModelDatasetType = new DocMIXED_MODEL_DATASET_TYPE(SnpGenDocument.kDefaultMultipleModelDatasetType);
+			heterogeneousLabelBoolean = new DocBoolean(Boolean.FALSE);
 		}
 
 		public int getCaseCount() {
