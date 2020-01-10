@@ -19,6 +19,8 @@ We also offer command line functionality. To use the software from the command l
 
 ## Usage
 
+To run the GAMETES user interface, simple click on the file gametes_2.2_dev.jar, located under /GAMETES/dist/
+
 To obtain a list of commands for command line operation, type:
 
 ```console
