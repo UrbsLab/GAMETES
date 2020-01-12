@@ -51,7 +51,7 @@ If there are no arguments, the graphical user interface will be opened otherwise
     {-o,--datasetOutputFile} string Output file name/path.  This parameter is used for -D to specify how dataset files are saved, and how they will be named.
     {-c,--continuous} <true if present, false otherwise> Directs algorithm to generate datasets with continuous-valued endpoints rather than binary discrete datasets.
     {-h,--mixedModelDatasetType} [heterogeneous, hierarchical] if there are multiple models use heterogeneous or hierarchical
-    {-b,--heteroLabel} <true if present, false otherwise> Produce output datasets that include model labels in addition to normal outupt when working with heterogeneous data.
+    {-b,--heteroLabel} <true if present, false otherwise> Produce output datasets that include model labels in addition to normal output when working with heterogeneous data.
     {-d,--standardDeviation} double The standard deviation around model penetrance values used to simulated continuous-valued endpoints.  Larger standard deviation values should yield noisier datasets, with a signal that is more difficult to detect.
 
 {-i,--modelInputFile} string Path/Name of input model file used for generating dataset(s).
