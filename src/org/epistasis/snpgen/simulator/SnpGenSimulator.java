@@ -236,13 +236,13 @@ public class SnpGenSimulator {
 					if (inProgressHandler != null) {
 						inProgressHandler.setValue(++fileCount);
 					}
-
+					
 					// Added by Vivek:
-					// If the heterogeneousLabelBoolean is selected, and we're actually creating heterogeneous data,
-					// and we have multiple models selected, then we'll call our function "addModelLabelToHeterogeneousOutput". This creates a new output file for each output file
-					// that has model labels as the first column
+					// If the heterogeneousLabelBoolean is selected, and we're not creating additive data,
+					// and we have multiple models selected, then we'll call our function "addModelLabelToHeterogeneousOutput". 
+					// This creates a new output file for each output file that has model labels as the first column
 					if(dd.heterogeneousLabelBoolean.toString().equals("true") && 
-					   dd.multipleModelDatasetType.toString().equals("heterogeneous") &&
+					   !dd.multipleModelDatasetType.toString().equals("hierarchical") &&
 					   document.modelFractions.length > 1)
 						addModelLabelToHeterogeneousOutput(datasetFile.getAbsolutePath(), document.modelFractions);
 				}

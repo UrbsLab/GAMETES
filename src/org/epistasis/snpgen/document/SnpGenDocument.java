@@ -309,7 +309,7 @@ public class SnpGenDocument {
 			
 			
 			final Option<Boolean> heterogeneousLabelBoolean = datasetParserTemplate.addBooleanOption('b', "heteroLabel", 
-					"Produce output datasets that include model labels in addition to normal outupt when working with heterogeneous data.");
+					"Produce output datasets that include model labels in addition to normal output when working with heterogeneous data.");
 			
 			final Option<Double> continuousEndpointsStandardDeviationOption = datasetParserTemplate
 					.addDoubleOption(
