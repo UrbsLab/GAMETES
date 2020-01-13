@@ -71,7 +71,7 @@ An example of generating a model file and associated datasets looks as follows:
 user:~$ java -jar gametes_2.2_dev.jar -M " -h 0.2 -p 0.3 -a 0.3 -a 0.2 -o myModel.txt" -q 2 -p 1000 -t 100000 -D " -n 0.01 -x 0.5 -a 100 -s 500 -w 500 -r 100 -o myData"
 ```
 
-New functionality includes continuous endpoints, additive datasets, and heterogenous datasets, both with and without model labels.
+New functionality in GAMETES version 2 includes continuous endpoints, additive datasets, and heterogenous datasets  with and without model labels. The following examples illustrate how to use them. 
 
 **Continuous Endpoints**
 ```console
@@ -99,7 +99,6 @@ For detailed explanation and more examples, see the User Guide.
 ## Organization of Source Code
 **Directory**
 
-    • bin
     • build [corresponding classes for the .java files]
     • launch
     • lib
