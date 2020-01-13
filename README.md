@@ -129,9 +129,7 @@ Please make sure to update tests as appropriate.
 
 **Importing GAMETES into Eclipse:**
 
-• Download the latest version of Eclipse from https://www.eclipse.org/downloads/
-
-• Downlaod the appropriate branch of GAMETES from GitHub
+• Download the appropriate branch of GAMETES from GitHub
 
 • Delete all existing .jar files in the GAMETES directory
 
@@ -139,7 +137,7 @@ Please make sure to update tests as appropriate.
 
 • In Eclipse, click “File > Import"
 
-• Within the import method that opens up, open the “General” tab and click “Projects from Folder or Archive”. Then click “Next"
+• Within the import box that opens up, open the “General” tab and click “Projects from Folder or Archive”. Then click “Next"
 
 • Click the “Directory” button next to the “Import source:” selection area, and navigate to the “src” folder of the GAMETES folder on your computer. Click “Open"
 
