@@ -116,39 +116,58 @@ For detailed explanation and more examples, see the User Guide.
                                 • Main
                                 • Model Generation [GUI functionality]
 
+For modifications to the GUI, refer to *SnpGenMainWindow.java* under the directory "src/org/epistasis/snpgen/ui/"
 
+To incorporate new commandline functions into GAMETES, refer to *SnpGenDocument.java* under the directory "src/org/epistasis/snpgen/document/"
 
-For GUI modifications, see *Model Generation*. 
-
-For editing model dialog functionality within the GUI, see *EditModelDialog.java*. 
-
-For generating model dialog functionality, see *GenerateModelDialog.java*. 
-
-For model creation and model tables, see *ModelCreationTable.java* and *ModelTable.java*. 
-
-For modifying the penetrance table pane, see *PenetranceTablePane.java*. 
-
-For command line functionality, see *snpgen* -> *document*. 
-
-For updating test cases, see the *scripts*.
-
+To add to the functionality of GAMETES, refer to *SnpGenSimulator.java* under the directory "src/org/epistasis/snpgen/simulator/"
 
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change. In particular, we welcome changes to update the GUI or changes to improve the code's modularity.
 
-We are especially looking to add GUI functionality for choosing between hierarchical and heterogeneous datasets, as this functionality currently exists only in the command line. 
-
 Please make sure to update tests as appropriate.
+
+**Importing GAMETES into Eclipse:**
+
+• Download the latest version of Eclipse from https://www.eclipse.org/downloads/
+
+• Downlaod the appropriate branch of GAMETES from GitHub
+
+• Delete all existing .jar files in the GAMETES directory
+
+• Launch Eclipse
+
+• In Eclipse, click “File > Import"
+
+• Within the import method that opens up, open the “General” tab and click “Projects from Folder or Archive”. Then click “Next"
+
+• Click the “Directory” button next to the “Import source:” selection area, and navigate to the “src” folder of the GAMETES folder on your computer. Click “Open"
+
+• “src” should be selected because it’s the only folder you’ve picked. Click “Finish"
+
+• The GAMETES src folder should now be in your Package Explorer, ready to edit
+
+• Open “src/org.epistasis.snpgen.ui/SnpGenMainWindow.java”. Clicking the green run arrow at the top of Eclipse for this file will successfully open up the GAMETES user interface
+
 
 **Building a .jar file:**
 
-• Import the Gametes zip as an existing archive file into Eclipse (see tips for debugging in Eclipse below)
+• Delete any existing .jar files from your GAMETES folder
 
-• Right click on the build.xml file, then run as "ant build"
+• Open up Terminal (or your equivalent commandline editor)
 
-• Go to your Eclipse Workplace (Finder) -> gametes-svn -> distr: here is the new .jar file, titled gametes_2.2_dev.jar
+• Check to make sure that you have "ant" installed by typing "ant -version". If you don't have ant, you can install it by calling "brew install ant""
 
+• Once ant is installed, navigate into the GAMETES directory
+
+• Create a "lib" folder within the GAMETES folder if it doesn't already exist
+
+• Type "ant compile"
+
+• Type "ant jar"
+
+• The new .jar file, titled "gametes_2.2_dev.jar" should now exist within the "dist" folder of your GAMETES directory
 
 
 **Some tips and tricks for editing and debugging:**
