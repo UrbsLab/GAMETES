@@ -369,4 +369,29 @@ LaTeX Warning: Reference `hetfile' on page 15 undefined on input line 190.
 ./main.tex:194: LaTeX Error: File `' not found.
 
 See the LaTeX manual or LaTeX Companion for explanation.
-Type  H <return>  for immediat
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.194 \includegraphics[width=0.8\textwidth]{}
+                                             % %16.6
+? 
+./main.tex:194: Emergency stop.
+ ...                                              
+                                                  
+l.194 \includegraphics[width=0.8\textwidth]{}
+                                             % %16.6
+I could not locate the file with any of these extensions:
+.pdf,.png,.jpg,.mps,.jpeg,.jbig2,.jb2,.PDF,.PNG,.JPG,.JPEG,.JBIG2,.JB2,.eps
+Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+ 
+Here is how much of TeX's memory you used:
+ 1536 strings out of 492616
+ 22174 string characters out of 6129482
+ 88577 words of memory out of 5000000
+ 5440 multiletter control sequences out of 15000+600000
+ 9621 words of font info for 34 fonts, out of 8000000 for 9000
+ 1141 hyphenation exceptions out of 8191
+ 41i,5n,25p,2604b,216s stack positions out of 5000i,500n,10000p,200000b,80000s
+./main.tex:194:  ==> Fatal error occurred, no output PDF file produced!

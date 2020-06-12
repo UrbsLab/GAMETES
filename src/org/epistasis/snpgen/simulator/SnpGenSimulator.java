@@ -243,8 +243,19 @@ public class SnpGenSimulator {
 					// This creates a new output file for each output file that has model labels as the first column
 					if(dd.heterogeneousLabelBoolean.toString().equals("true") && 
 					   !dd.multipleModelDatasetType.toString().equals("hierarchical") &&
-					   document.modelFractions.length > 1)
-						addModelLabelToHeterogeneousOutput(datasetFile.getAbsolutePath(), document.modelFractions);
+					   document.modelFractions.length > 1) {
+						
+						final int instanceCount = dd.totalCount.getInteger().intValue();
+						final int caseCount = (int) Math.round(dd.caseProportion.value * instanceCount);
+						int controlCount = instanceCount - caseCount;
+						// System.out.println("Case count is " + caseCount);
+						// System.out.println("Control count is " + controlCount);
+						//final int controlCount = instanceCount - caseCount;
+						
+						//addModelLabelToHeterogeneousOutput(datasetFile.getAbsolutePath(), document.modelFractions);
+						addModelLabelToHetOutputCaseControl(datasetFile.getAbsolutePath(), document.modelFractions, caseCount);
+
+					}
 				}
 			}
 		}
@@ -1296,12 +1307,94 @@ public class SnpGenSimulator {
 	}
 
 
+	/*
+	 * // NOTE: THIS IS AN OLD FUNCTION. DO NOT USE // Added by Vivek; trying to add
+	 * a model label column to an output file for heterogeneous data // Function to
+	 * add a model label column to an output file for heterogeneous data private
+	 * static String[][] addModelLabelToHeterogeneousOutput(final String destFile,
+	 * double[] modelProportions) throws Exception{ // Get the outputArray from the
+	 * destFile filepath String[][] outputArray = readIn2DTableFromText(destFile);
+	 * 
+	 * // firstColumn array will be same length as number of rows in our array of
+	 * values String[] firstColumn = new String[outputArray.length];
+	 * 
+	 * // Normalize the model proportions input // I.e., from the UI, model
+	 * proportions will be [1.0, 1.0], but we want it to be [0.5, 0.5] double
+	 * sumOfProps = 0.0; for(int propIndex = 0; propIndex < modelProportions.length;
+	 * propIndex++) sumOfProps += modelProportions[propIndex]; double[]
+	 * normalizedModelProps = new double[modelProportions.length]; for(int propIndex
+	 * = 0; propIndex < normalizedModelProps.length; propIndex++)
+	 * normalizedModelProps[propIndex] = modelProportions[propIndex]/sumOfProps;
+	 * 
+	 * // Convert the normalized model proportions into a cumulative distribution //
+	 * I.e., if we have [0.3, 0.3, 0.4], we want to make it [0.3, 0.6, 1.0] double[]
+	 * cumulativeModelProportions = new double[normalizedModelProps.length]; double
+	 * totalSum = 0.0; for(int i = 0; i < normalizedModelProps.length; i++) {
+	 * cumulativeModelProportions[i] = normalizedModelProps[i] + totalSum; totalSum
+	 * = totalSum + normalizedModelProps[i]; }
+	 * 
+	 * // Iterate over each row in our output array to determine the values of our
+	 * new first column for(int rowNum = 1; rowNum < outputArray.length; rowNum++) {
+	 * // Calculate the current row proportion; make sure to subtract 1 from
+	 * everything to ignore the header row double currentRowProportion =
+	 * (double)(rowNum-1)/(outputArray.length-1);
+	 * 
+	 * // Initialize the model number for the row; set it to -1 so that if our
+	 * function fails, we're able to tell int desiredModelPropIndex = -1;
+	 * 
+	 * // Look at each row's currentRowProportion, and make sure it is as high as
+	 * possible in the modelProportions array for(int modelProportionsIndex = 0;
+	 * modelProportionsIndex < cumulativeModelProportions.length;
+	 * modelProportionsIndex++){ // If the row's current proportion is less than the
+	 * model proportion, then we're good if(currentRowProportion <
+	 * cumulativeModelProportions[modelProportionsIndex]){ desiredModelPropIndex =
+	 * modelProportionsIndex; break; } }
+	 * 
+	 * // Set the appropriate value in our first column String currentRowsModel =
+	 * "Model_" + Integer.toString(desiredModelPropIndex); firstColumn[rowNum] =
+	 * currentRowsModel; }
+	 * 
+	 * // Make sure to set the header of our new column to be "Model" firstColumn[0]
+	 * = "Model";
+	 * 
+	 * // Get the dimensions of outputArray int numRows = outputArray.length; int
+	 * numCols = outputArray[0].length;
+	 * 
+	 * // Define a newoutputArray that has the same number of rows, and then one
+	 * more column String[][] newOutputArray = new String[numRows][numCols+1];
+	 * 
+	 * // Set the first column of newOutputArray to be the first column we
+	 * calculated earlier for(int rowIndex = 0; rowIndex < numRows; rowIndex++)
+	 * newOutputArray[rowIndex][0] = firstColumn[rowIndex];
+	 * 
+	 * // Set the rest of newOutputArray to be outputArray for(int rowIndex = 0;
+	 * rowIndex < numRows; rowIndex++){ for(int colIndex = 0; colIndex < numCols;
+	 * colIndex++){ newOutputArray[rowIndex][colIndex+1] =
+	 * String.valueOf(outputArray[rowIndex][colIndex]); } }
+	 * 
+	 * // Write the newOutputArray to the destFile path String destFileForWriting =
+	 * destFile.substring(0, destFile.length() - 4) + "_hetLabel.txt"; FileWriter
+	 * writer = new FileWriter(destFileForWriting, false); for (int i = 0; i <
+	 * newOutputArray.length; i++) { for (int j = 0; j < newOutputArray[i].length;
+	 * j++) writer.write(newOutputArray[i][j]+ "\t");
+	 * 
+	 * writer.write("\n"); // write new line } writer.close();
+	 * 
+	 * // Return the new array as final output return newOutputArray; }
+	 */
+	
+	
+	
+	
+	
 	// Added by Vivek; trying to add a model label column to an output file for heterogeneous data
 	// Function to add a model label column to an output file for heterogeneous data
-	private static String[][] addModelLabelToHeterogeneousOutput(final String destFile, double[] modelProportions) throws Exception{
+	// HOW IT WORKS: given model proportions, we assign labels in the required proportions to cases and THEN to controls
+	private static String[][] addModelLabelToHetOutputCaseControl(final String destFile, double[] modelProportions, int caseCount) throws Exception{
+		
 		// Get the outputArray from the destFile filepath
 		String[][] outputArray = readIn2DTableFromText(destFile);
-
+	
 		// firstColumn array will be same length as number of rows in our array of values		
 		String[] firstColumn = new String[outputArray.length];
 
@@ -1313,7 +1406,7 @@ public class SnpGenSimulator {
 		double[] normalizedModelProps = new double[modelProportions.length];
 		for(int propIndex = 0; propIndex < normalizedModelProps.length; propIndex++)
 			normalizedModelProps[propIndex] = modelProportions[propIndex]/sumOfProps;
-		
+			
 		// Convert the normalized model proportions into a cumulative distribution
 		// I.e., if we have [0.3, 0.3, 0.4], we want to make it [0.3, 0.6, 1.0]
 		double[] cumulativeModelProportions = new double[normalizedModelProps.length];
@@ -1322,12 +1415,13 @@ public class SnpGenSimulator {
 			cumulativeModelProportions[i] = normalizedModelProps[i] + totalSum;
 			totalSum = totalSum + normalizedModelProps[i];
 		}
-			
-		// Iterate over each row in our output array to determine the values of our new first column	
-		for(int rowNum = 1; rowNum < outputArray.length; rowNum++) {
+				
+		// Iterate over our set of cases to determine labels according to our model proportions
+		for(int caseIter = 0; caseIter < caseCount; caseIter++) {
 			// Calculate the current row proportion; make sure to subtract 1 from everything to ignore the header row
-			double currentRowProportion = (double)(rowNum-1)/(outputArray.length-1);
-
+			double currentRowProportion = (double)(caseIter)/(caseCount);
+			// System.out.println("Current row prop for cases is " + currentRowProportion);
+			
 			// Initialize the model number for the row; set it to -1 so that if our function fails, we're able to tell
 			int desiredModelPropIndex = -1;
 			
@@ -1342,18 +1436,44 @@ public class SnpGenSimulator {
 
 			// Set the appropriate value in our first column
 			String currentRowsModel = "Model_" + Integer.toString(desiredModelPropIndex);
-			firstColumn[rowNum] = currentRowsModel;
+			firstColumn[caseIter+1] = currentRowsModel;
 		}
+		
+		
+		// Iterate over our set of controls to determine labels according to our model proportions
+		for(int controlIter = 0; controlIter < outputArray.length-caseCount-1; controlIter++) {
+			// Calculate the current row proportion; make sure to subtract 1 from everything to ignore the header row
+			double currentRowProportion = (double)(controlIter)/(outputArray.length-caseCount-1);
+			// System.out.println("Current row prop for controls is " + currentRowProportion);
 
+			// Initialize the model number for the row; set it to -1 so that if our function fails, we're able to tell
+			int desiredModelPropIndex = -1;
+						
+			// Look at each row's currentRowProportion, and make sure it is as high as possible in the modelProportions array
+			for(int modelProportionsIndex = 0; modelProportionsIndex < cumulativeModelProportions.length; modelProportionsIndex++){
+				// If the row's current proportion is less than the model proportion, then we're good
+				if(currentRowProportion < cumulativeModelProportions[modelProportionsIndex]){
+					desiredModelPropIndex = modelProportionsIndex;
+					break;
+				}
+			}
+
+			// Set the appropriate value in our first column
+			String currentRowsModel = "Model_" + Integer.toString(desiredModelPropIndex);
+			firstColumn[controlIter + caseCount + 1] = currentRowsModel;
+		}
+		
+		
 		// Make sure to set the header of our new column to be "Model"
 		firstColumn[0] = "Model";
-			
+				
 		// Get the dimensions of outputArray
-		int numRows = outputArray.length; int numCols = outputArray[0].length;
-			
+		int numRows = outputArray.length; 
+		int numCols = outputArray[0].length;
+				
 		// Define a newoutputArray that has the same number of rows, and then one more column
 		String[][] newOutputArray = new String[numRows][numCols+1];
-		
+			
 		// Set the first column of newOutputArray to be the first column we calculated earlier
 		for(int rowIndex = 0; rowIndex < numRows; rowIndex++)
 			newOutputArray[rowIndex][0] = firstColumn[rowIndex];
@@ -1367,19 +1487,21 @@ public class SnpGenSimulator {
 
 		// Write the newOutputArray to the destFile path
 		String destFileForWriting = destFile.substring(0, destFile.length() -  4) + "_hetLabel.txt";
-        FileWriter writer = new FileWriter(destFileForWriting, false);
-        for (int i = 0; i < newOutputArray.length; i++) {
-            for (int j = 0; j < newOutputArray[i].length; j++)
-             	writer.write(newOutputArray[i][j]+ "\t");
+	    FileWriter writer = new FileWriter(destFileForWriting, false);
+	    for (int i = 0; i < newOutputArray.length; i++) {
+	    	for (int j = 0; j < newOutputArray[i].length; j++)
+	    		writer.write(newOutputArray[i][j]+ "\t");
 
-            writer.write("\n");   // write new line
-        }
-        writer.close();
+	        writer.write("\n");   // write new line
+	    }
+	    
+	    writer.close();
 
 		// Return the new array as final output
 		return newOutputArray;	
 	}
-	
+		
+		
 
 	public static class PenetranceTableQuantile {
 		public PenetranceTable[] tables;
