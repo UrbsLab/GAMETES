@@ -62,6 +62,7 @@ import org.epistasis.snpgen.simulator.SnpGenSimulator;
 
 public class SnpGenMainWindow implements ModelTable.UpdateListener
 {
+	// Attributes
     private int nextModelNumber = 1;
     JTextArea output;
     ModelTable modelTable;
@@ -94,6 +95,16 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
     }
 
+    //---------------------------------------------------------------------------------------------------------------
+
+    // FUNCTIONS
+    
+    /* Function: addBackedModel
+     * Input: Container inContainer, DocModel inDocModel
+     * Output: BackedModelUi outModelUi
+     * ----------------------------------------------------------------
+     * Description: 
+     */
     public BackedModelUi addBackedModel(final Container inContainer, final DocModel inDocModel) {
         final BackedModelUi outModelUi = new BackedModelUi();
         outModelUi.setOpaque(true);
@@ -119,21 +130,32 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         return outModelUi;
     }
 
+    /* Function: createContentPane
+     * Input: N/A
+     * Output: Container contentPane
+     * ----------------------------------------------------------------
+     * Description: Create the full content pane using JPanels to include
+     *  model and dataset information
+     */
     public Container createContentPane() {
         JPanel contentPane; // The content pane of the window
         JPanel datasetPane; // The left tab
         JPanel modelPane; // The right tab
 
+        // Initialize and set the layout of the full contentPane
         contentPane = new JPanel();
         contentPane.setLayout(new BoxLayout(contentPane, BoxLayout.Y_AXIS));
         contentPane.setOpaque(true);
 
+        // Initialize and set the layout of the modelPane
         modelPane = new JPanel();
         modelPane.setBorder(BorderFactory.createTitledBorder("Model Construction"));
         fillInModelPane(modelPane);
 
+        // Initialize the dataset pane
         datasetPane = new DatasetPanel();
 
+        // Add both the modelPane and the datasetPane
         contentPane.add(modelPane, BorderLayout.CENTER);
         contentPane.add(datasetPane, BorderLayout.CENTER);
 
@@ -148,6 +170,12 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         return contentPane;
     }
 
+    /* Function: createMenuBar
+     * Input: N/A
+     * Output: JMenuBar menuBar
+     * ----------------------------------------------------------------
+     * Description: Create the menu bar
+     */
     public JMenuBar createMenuBar() {
         JMenuBar menuBar;
         JMenu menu;
@@ -167,17 +195,38 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         return menuBar;
     }
 
+    /* Function: updateQuantileCountField
+     * Input: int inCount
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: update quantile counts in the datasetControlPanel,
+     *  the quantileCountFieldMainWindow, and the documentLink's rasQuantileCount
+     */
     public void updateQuantileCountField(final int inCount) {
+    	// Set the desired quantile count to be the input inCount
         desiredQuantileCount = inCount;
+        
+        // Set the value of the documents rasQuantileCount to be the inCount
         documentLink.getDocument().rasQuantileCount.setValue(inCount);
+        
+        // Set the text of the quantileCountFieldMainWindow
         if (inCount > 0) {
             quantileCountFieldMainWindow.setText(Integer.toString(inCount));
         } else {
             quantileCountFieldMainWindow.setText("--");
         }
+        
+        // Update the datasetCountField for the datasetControlPanel
         datasetControlPanel.updateDatasetCountField();
     }
 
+    /* Function: updateSelection
+     * Input: N/A
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: Get the common quantile count of the models, and update
+     *  the overall quantile count as well as the button enablement
+     */
     @Override
     public void updateSelection() {
         final Integer commonQuantileCount = getCommonQuantileCount();
@@ -185,12 +234,21 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         updateButtonEnablement(commonQuantileCount);
     }
 
+    /* Function: addComponent
+     * Input: Class inClass, Container inContainer, DocMember inBackingField, int inColumnCount, String inLabel
+     * Output: JComponent SnpGenMainWindow.addComponent
+     * ----------------------------------------------------------------
+     * Description: Return the added component based upon the input
+     */
     // WARNING: If you change the relationship of inClass to the class of the
     // output JComponent, be sure to update the createBacked<whatever> methods above.
     protected JComponent addComponent(final Class<?> inClass, final Container inContainer,
             final DocMember<?> inBackingField, final int inColumnCount, final String inLabel) {
+    	// Get the outComponent
         JComponent outComp = null;
         outComp = null;
+        
+        // If there is a backing field, determine the type of inClass and use it to specify the outComponent
         if (inBackingField != null) {
             if (inClass.equals(JCheckBox.class)) {
                 outComp = new BackedCheckBox((DocBoolean) inBackingField);
@@ -204,45 +262,91 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         return SnpGenMainWindow.addComponent(outComp, inClass, inContainer, inColumnCount, inLabel);
     }
 
+    /* Function: addBackedBoolean
+     * Input: Container inContainer, DocBoolean inBackingField, int inColumnCount, String inLabel
+     * Output: BackedCheckBox addComponent
+     * ----------------------------------------------------------------
+     * Description: Return the added component based upon the input
+     */
     // WARNING: If you change the relationship of inClass to the class of the
     // output JComponent, be sure to update the createBacked<whatever> methods above.
-
     private BackedCheckBox addBackedBoolean(final Container inContainer, final DocBoolean inBackingField,
             final int inColumnCount, final String inLabel) {
         return (BackedCheckBox) addComponent(JCheckBox.class, inContainer, inBackingField, inColumnCount, inLabel);
     }
 
+    /* Function: addBackedDouble
+     * Input: Container inContainer, DocDouble inBackingField, int inColumnCount, String inLabel
+     * Output: BackedTextField addComponent
+     * ----------------------------------------------------------------
+     * Description: Return the added component based upon the input
+     */
     private BackedTextField addBackedDouble(final Container inContainer, final DocDouble inBackingField,
             final int inColumnCount, final String inLabel) {
         return (BackedTextField) addComponent(JTextField.class, inContainer, inBackingField, inColumnCount, inLabel);
     }
 
+    /* Function: addBackedInteger
+     * Input: Container inContainer, DocInteger inBackingField, intinColumnCount, String inLabel
+     * Output: BackedTextField addComponent
+     * ----------------------------------------------------------------
+     * Description: Return the added component based upon the input
+     */
     private BackedTextField addBackedInteger(final Container inContainer, final DocInteger inBackingField,
             final int inColumnCount, final String inLabel) {
         return (BackedTextField) addComponent(JTextField.class, inContainer, inBackingField, inColumnCount, inLabel);
     }
 
+    /* Function: addBackedLabel
+     * Input: Container inContainer, DocMember<> inBackingField, int inColumnCount, String inLabel
+     * Output: BackedLabel addComponent
+     * ----------------------------------------------------------------
+     * Description: Return the added component based upon the input
+     */
     private BackedLabel addBackedLabel(final Container inContainer, final DocMember<?> inBackingField,
             final int inColumnCount, final String inLabel) {
         return (BackedLabel) addComponent(JLabel.class, inContainer, inBackingField, inColumnCount, inLabel);
     }
 
+    /* Function: addBackedString
+     * Input: Container inContainer, DocString inBackingField, int inColumnCount, String inLabel
+     * Output: BackedTextField addComponent
+     * ----------------------------------------------------------------
+     * Description: Return the added component based upon the input
+     */
     private BackedTextField addBackedString(final Container inContainer, final DocString inBackingField,
             final int inColumnCount, final String inLabel) {
         return (BackedTextField) addComponent(JTextField.class, inContainer, inBackingField, inColumnCount, inLabel);
     }
 
+    /* Function: checkButtonEnablement
+     * Input: N/A
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: Get the common quantile count and update button
+     *  enablement based upon the quantile count
+     */
     private void checkButtonEnablement() {
         final Integer commonQuantileCount = getCommonQuantileCount();
         updateButtonEnablement(commonQuantileCount);
     }
 
+    /* Function: chooseFile
+     * Input: Component inParent, String inTitle
+     * Output: File outFile
+     * ----------------------------------------------------------------
+     * Description: Identify the appropriate file given our input filename
+     */
     private File chooseFile(final Component inParent, final String inTitle) {
+    	// Initialize the outFile
         File outFile = null;
 
+        // If there is an input title, set the dialog title of the file chooser
         if (inTitle != null) {
             fileChooser.setDialogTitle(inTitle);
         }
+        
+        // Get the file corresponding to our input title/inParent
         final int returnVal = fileChooser.showSaveDialog(inParent);
         if (returnVal == JFileChooser.APPROVE_OPTION) {
             outFile = fileChooser.getSelectedFile();
@@ -250,6 +354,12 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         return outFile;
     }
 
+    /* Function: cleanUpModelName
+     * Input: String modelName
+     * Output: String modelName
+     * ----------------------------------------------------------------
+     * Description: strip down the name of the model for consistency
+     */
     private String cleanUpModelName(String modelName) {
         final int dot = modelName.indexOf(".");
         if (dot >= 0) {
@@ -262,30 +372,51 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         return modelName;
     }
 
-    /**
-     * Create the GUI and show it. For thread safety, this method should be invoked from the event-dispatching thread.
+    /* Function: createAndShowGUI
+     * Input: N/A
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: Convert the documentLinkt to a GUI, and then create
+     *  a new JFRAME, showing the GUI
+     * 
+     * 
+     * Original comment: Create the GUI and show it. For thread safety, this
+     *  method should be invoked from the event-dispatching thread.
      */
     private void createAndShowGUI() {
         try {
+        	// Convert the documentLink to a GUI
             documentLink.documentToGui();
         } catch (final IllegalAccessException iea) {
         }
 
+        // Initialize a new JFrame
         frame = new JFrame("GAMETES 2.2 dev");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
         frame.setContentPane(createContentPane());
         updateSelection();
-
         frame.setSize(720, 900);
         frame.setVisible(true);
     }
 
+    
+    /* Function: createSnpGenDocument
+     * Input: N/A
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: 
+     */
     private void createSnpGenDocument() throws IllegalAccessException {
         documentLink.setDocument(new SnpGenDocument(true));
         documentLink.documentToGui();
     }
 
+    /* Function: createSnpModel
+     * Input: N/A
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: 
+     */
     private void createSnpModel() throws IOException {
         final SnpGenDocument document = getDocument();
         final int firstAttributeNumber = document.getNextPredictiveAttributeNumber();
@@ -301,6 +432,12 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         editSnpModel(-1, model, false, snpTitles[2]);
     }
 
+    /* Function: editSnpModel
+     * Input: N/A
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: 
+     */
     private void editSnpModel() throws IOException {
         final SnpGenDocument document = getDocument();
         final int[] selections = modelTable.getWhichSelectedModels();
@@ -363,6 +500,13 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
     }
 
+
+    /* Function: fillInModelPane
+     * Input: JPanel inModelPane
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: 
+     */
     private void fillInModelPane(final JPanel inModelPane) {
         inModelPane.setLayout(new BoxLayout(inModelPane, BoxLayout.Y_AXIS));
 
@@ -414,6 +558,12 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         inModelPane.add(modelFooterPane);
     }
 
+    /* Function: generateDatasets
+     * Input: N/A
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: 
+     */
     private void generateDatasets() {
         Exception paramError;
         try {
@@ -457,9 +607,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
                 if (except != null) {
                     throw except;
                 }
-
                 // simulator.generateDatasets(doc, null);
-
                 // progressor.setVisible(false);
             }
         } catch (final Exception ex) {
@@ -467,6 +615,12 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
     }
 
+    /* Function: generateSnpModel
+     * Input: N/A
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: 
+     */
     private void generateSnpModel() {
         final SnpGenDocument document = getDocument();
         final int modelNumber = nextModelNumber++;
@@ -557,7 +711,14 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
     }
 
-    // If all of the selected models have the same quantile-count then return that number, else return null.
+    
+    /* Function: getCommonQuantileCount
+     * Input: N/A
+     * Output: Integer quantileCount
+     * ----------------------------------------------------------------
+     * Description: If all of the selected models have the same 
+     *  quantile count, then return that number. Otherwise, return null
+     */
     private Integer getCommonQuantileCount() {
         Integer quantileCount = null;
         final ArrayList<SnpGenDocument.DocModel> models = getSelectedModels();
@@ -574,10 +735,22 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         return quantileCount;
     }
 
+    /* Function: getDocument
+     * Input: N/A
+     * Output: documentLink.getDocument()
+     * ----------------------------------------------------------------
+     * Description: Return the document of the documentLink
+     */
     private SnpGenDocument getDocument() {
         return documentLink.getDocument();
     }
-
+    
+    /* Function: getSelectModels
+     * Input: N/A
+     * Output: ArrayList<SnpGenDocument.DocModel> outModels
+     * ----------------------------------------------------------------
+     * Description: 
+     */
     // If all of the selected models have the same quantile-count then return that number, else return null.
     private ArrayList<SnpGenDocument.DocModel> getSelectedModels() {
         final ArrayList<SnpGenDocument.DocModel> outModels = new ArrayList<SnpGenDocument.DocModel>();
@@ -601,6 +774,13 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         return outModels;
     }
 
+    /* Function: handleExpection
+     * Input: Exception inEx
+     * Output: Exception
+     * ----------------------------------------------------------------
+     * Description: Return the appropriate error message based upon the type
+     *  of exception
+     */
     private Exception handleException(final Exception inEx) {
         if (inEx instanceof InputException) {
             showErrorMessage("Input error", inEx.getLocalizedMessage());
@@ -616,12 +796,23 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         return null; // could return an exception that still needs to be handled
     }
 
-    // Load the file specified by the instance variable "file" into the UI
+    /* Function: loadDocument
+     * Input: File inFile, GuiDocumentLink inLink
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: Load the file specified by the instance variable "file" into the UI
+     */
     private void loadDocument(final File inFile, final GuiDocumentLink inLink) throws IllegalAccessException {
         inLink.getDocument().load(inFile);
         inLink.documentToGui();
     }
 
+    /* Function: loadModelFile
+     * Input: N/A
+     * Output: 
+     * ----------------------------------------------------------------
+     * Description: 
+     */
     private void loadModelFile() {
         try {
             final int returnVal = fileChooser.showOpenDialog(frame);
@@ -645,6 +836,13 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
     }
 
+    /* Function: openDocument
+     * Input: N/A
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: Get the file corresponding to the current open dialog
+     *  load it
+     */
     private void openDocument() throws IllegalAccessException {
         final int returnVal = fileChooser.showOpenDialog(frame);
 
@@ -654,6 +852,12 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
     }
 
+    /* Function: removeSnpModel
+     * Input: Exception inEx
+     * Output: 
+     * ----------------------------------------------------------------
+     * Description: 
+     */
     private void removeSnpModel() {
         final SnpGenDocument document = getDocument();
         final int[] selections = modelTable.getWhichSelectedModels();
@@ -668,6 +872,12 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         checkButtonEnablement();
     }
 
+    /* Function: saveDocument
+     * Input: N/A
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: Save the current file 
+     */
     private void saveDocument() throws IllegalAccessException {
         if (file == null) {
             saveDocumentAs();
@@ -676,6 +886,12 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
     }
 
+    /* Function: saveDocumentAs
+     * Input: N/A
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: Save the document from the selected file
+     */
     private void saveDocumentAs() throws IllegalAccessException {
         final int returnVal = fileChooser.showSaveDialog(frame);
 
@@ -685,17 +901,39 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
     }
 
+    /* Function: showErrorMessage
+     * Input: String inTitle, String inMessage
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: Print out the error message and show it using the JOptionPane 
+     */
     private void showErrorMessage(final String inTitle, final String inMessage) {
         System.out.println(inMessage);
         JOptionPane.showMessageDialog(frame, inMessage, inTitle, JOptionPane.ERROR_MESSAGE);
     }
 
+    /* Function: storeDocument
+     * Input: File inFile, GuiDocumentLink inLink
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: Convert the inLink to a document and store it at the
+     *   file location
+     */
     // Store the UI into the file specified by the instance variable "file"
     private void storeDocument(final File inFile, final GuiDocumentLink inLink) throws IllegalAccessException {
+    	// Given the GuiDocumentLink, convert it to a document
         inLink.guiToDocument();
+        
+        // Get the document for the GuiDocumentLink, and store it at the inFile
         inLink.getDocument().store(inFile);
     }
 
+    /* Function: handleExpection
+     * Input: Exception inEx
+     * Output: 
+     * ----------------------------------------------------------------
+     * Description: 
+     */
     private void updateButtonEnablement(final Integer commonQuantileCount) {
         final SnpGenDocument document = getDocument();
         if ((document.getModelCount() <= 0) || (document.firstDataset.totalCount.value <= 0)) {
@@ -738,23 +976,48 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
     }
 
+    /* Function: updateQuantileCount
+     * Input: Integer commonQuantileCount
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: Update the quantileCountField based upon the common
+     *  quantile count of our models
+     */
     private void updateQuantileCount(final Integer commonQuantileCount) {
+    	// Get the common quantile count of our input models
         final Integer quantileCount = getCommonQuantileCount();
+        
+        // If there is no quantileCount, update its field to 0
         if (quantileCount == null) {
             updateQuantileCountField(0);
+        // Otherwise, update the field to the common quantile ocunt
         } else {
             updateQuantileCountField(quantileCount);
         }
     }
 
+    /* Function: viewDataFile
+     * Input: N/A
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: Does nothing?
+     * TODO: figure out what this function does... 
+     */
     private void viewDataFile() {
     }
 
     
+    /* Function: main
+     * Input: N/A
+     * Output: 
+     * ----------------------------------------------------------------
+     * Description: 
+     */
     public static void main(final String[] args) {
-
+    	// Initialize a new SnpGenDocument
         final SnpGenDocument doc = new SnpGenDocument(false);
 
+        // Determine if the input document has arguments or not (i.e., if this commandline or GUI input?)
         boolean showGui = false;
         try {
             showGui = doc.parseArguments(args);
@@ -763,20 +1026,33 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             e.printStackTrace();
         }
         
+        // Boolean that tells us if the software is being run with normal arguments (no help and no GUI)
         final boolean runDocument = doc.runDocument;
         
+        // If we're going into the GUI...
         if (showGui) {
             System.out.println("Going into GUI!");
+            // Initialize a dataset to contain required info
             doc.createFirstDataset();
+            // TODO: figure out what the "createAndShowGui" function does
             SnpGenMainWindow.createAndShowGui(doc);
         }
 
+        // If we're not going into the GUI and we're not calling help...
         if (runDocument) {
+            // Initialize a dataset to contain required info
             doc.createFirstDataset();
             SnpGenMainWindow.runDocument(doc);
         }
     }
 
+    /* Function: addComponent
+     * Input: JComponent inComp, Class inClass, Container inContainer, int inColumnCount, String inLabel
+     * Output: JComponent outComp
+     * ----------------------------------------------------------------
+     * Description: Adds an extra component when including labels for models or datasets
+     * TODO: figure out exactly what this function does...
+     */
     // WARNING: If you change the relationship of inClass to the class of the
     // output JComponent, be sure to update the createBacked<whatever> methods above.
     static protected JComponent addComponent(final Class<?> inClass, final Container inContainer,
@@ -787,7 +1063,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
     // WARNING: If you change the relationship of inClass to the class of the
     // output JComponent, be sure to update the createBacked<whatever> methods above.
     static protected JComponent addComponent(final JComponent inComp, final Class<?> inClass,
-            final Container inContainer, final int inColumnCount, final String inLabel) {
+            final Container inContainer, final int inColumnCount, final String inLabel){
         JLabel label = null;
         JComponent outComp = null;
         JComponent holder;
@@ -826,30 +1102,58 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         return outComp;
     }
 
+    
     /**
      * @wbp.parser.entryPoint
      */
-    private static void createAndShowGui(final SnpGenDocument inSnpGenDocument) {
+    /* Function: createAndShowGui
+     * Input: SnpGenDocument inSnpGenDocument
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: Take the input SnpGenDocument, convert it to an
+     *  object of type SnpGenMainWindow, and run the "createAndShowGUI"
+     *  function
+     */
+    private static void createAndShowGui(final SnpGenDocument inSnpGenDocument){
+    	// Create an object of class SnpGenMainWindow given our input document
         final SnpGenMainWindow snpGen = new SnpGenMainWindow(inSnpGenDocument);   
         
         // Schedule a job for the event-dispatching thread: creating and showing this application's GUI.
         javax.swing.SwingUtilities.invokeLater(new Runnable() {
             @Override
-            public void run() {
+            public void run(){
+            	// Call createAndShowGUI for the SnpGenMainWindow object
                 snpGen.createAndShowGUI();
             }
         });
     }
-
+    
+    /* Function: runDocument
+     * Input: SnpGenDocument inDocument
+     * Output: N/A
+     * ----------------------------------------------------------------
+     * Description: Function to run GAMETES given an input document.
+     *  We verify that we have the required parameters to run GAMETES,
+     *  then we create a new SnpGenSimulator whose document is our
+     *  input document. Getting the quantile count and list of models
+     *  from this document, we generate model tables, convert them
+     *  into quantiles, and produce resulting datasets
+     */
     private static void runDocument(final SnpGenDocument inDocument) {
         Exception paramError;
         try {
+        	// If we don't have all the needed parameters, throw an error
             if ((paramError = inDocument.verifyAllNeededParameters()) != null) {
                 throw paramError;
             }
 
+            // Initialize a new SnpGenSimulator
             final SnpGenSimulator simulator = new SnpGenSimulator();
+            
+            // Set the simulator's SnpGenDocument to be "inDocument"
             simulator.setDocument(inDocument);
+            
+            // Get the desired quantile count and the list of models from the inDocument
             final int desiredQuantileCount = inDocument.rasQuantileCount.getInteger();
             final ArrayList<DocModel> modelList = inDocument.modelList;
             
@@ -857,10 +1161,9 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             final double[][] allTableScores = simulator.generateTablesForModels(modelList, desiredQuantileCount,
                     inDocument.rasPopulationCount.getInteger(), inDocument.rasTryCount.getInteger(), null);
             
+            // Write tables and scores, combine the tables into quantiles, and generate the appropriate datasets
             simulator.writeTablesAndScoresToFile(modelList, allTableScores, desiredQuantileCount);
-            
             simulator.combineModelTablesIntoQuantiles(modelList, inDocument.modelInputFiles);
-            
             simulator.generateDatasets(null);
             
         } catch (final Exception ex) {
@@ -869,6 +1172,11 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
     }
 
+    
+    //---------------------------------------------------------------------------------------------------------------
+
+    
+    // CLASSES
     public static abstract class Action extends AbstractAction {
         private static final long serialVersionUID = 1L;
 
@@ -986,7 +1294,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             updateGuiToData();
         }
     }
-
+    
     public static class CreateModelAction extends SnpGenAction {
         private static final long serialVersionUID = 1L;
 
@@ -1748,7 +2056,6 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
 
         public BackedModelUi() {
         }
-
     }
 
     private static class BackedTextField extends JTextField implements BackedComponent {
@@ -1772,19 +2079,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             docField.setValueFromString(getText());
         }
     }
-
-    private static enum ENDPOINT_TYPES {
-        QUANTITATIVE_TRAIT, BINARY_CLASS
-    }
-
-    private static enum DATA_TYPES {
-        ADDITIVE, HETEROGENOUS
-    }
-
-    private static enum FIXED_OR_VARIABLE_NUMBER_OF_SAMPLES {
-        VARIABLE, FIXED
-    }
-
+    
     private static class GuiDocumentLink {
         private SnpGenDocument document;
         private final ArrayList<BackedComponent> backedComponents;
@@ -1798,7 +2093,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
 
         public void documentToGui() throws IllegalAccessException {
-            for (final BackedComponent comp : backedComponents) {
+            for(final BackedComponent comp : backedComponents) {
                 comp.load();
             }
         }
@@ -1821,7 +2116,22 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         }
     }
 
-    private static enum noiseAttributeTypes {
+    //---------------------------------------------------------------------------------------------------------------
+    
+    // STATIC ENUMS
+    private static enum ENDPOINT_TYPES {
+        QUANTITATIVE_TRAIT, BINARY_CLASS
+    }
+
+    private static enum DATA_TYPES{
+        ADDITIVE, HETEROGENOUS
+    }
+
+    private static enum FIXED_OR_VARIABLE_NUMBER_OF_SAMPLES {
+        VARIABLE, FIXED
+    }
+
+    private static enum noiseAttributeTypes{
         GENERATED, FROM_DISK
     }
 }

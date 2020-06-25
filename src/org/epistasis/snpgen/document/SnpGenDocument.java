@@ -272,12 +272,17 @@ public class SnpGenDocument {
 		   args = argString.split("%");
 
 		*/
+		
+		// If there are zero arguments, then we are going into the GUI
 		if (args.length == 0) {
 			outShowGui = true;
 		} else {
+			// There is at least one argument, so we want to use the command-line arguments
 			outShowGui = false;
 
+			// Initialize a new CmdLineParserSrc that will read in variable options related to the dataset
 			final CmdLineParserSrc datasetParserTemplate = new CmdLineParserSrc();
+			// Input options for the command-line
 			final Option<Double> alleleFrequencyMinOption = datasetParserTemplate.addDoubleOption('n', "alleleFrequencyMin",
 					"Minimum minor allele frequency for randomly generated, non-predictive attributes in datasets.");
 			final Option<Double> alleleFrequencyMaxOption = datasetParserTemplate.addDoubleOption('x', "alleleFrequencyMax",
@@ -289,84 +294,62 @@ public class SnpGenDocument {
 					"(continuous data only) How many samples to generate for each dataset.");
 			final Option<Integer> caseCountOption = datasetParserTemplate.addIntegerOption('s', "caseCount",
 					"(discrete data only) Number of case instances in simulated dataset(s).  Cases have class = '1'.");
-			final Option<Integer> controlCountOption = datasetParserTemplate
-					.addIntegerOption('w', "controlCount",
+			final Option<Integer> controlCountOption = datasetParserTemplate.addIntegerOption('w', "controlCount",
 							"(discrete data only) Number of control instances in simulated dataset(s).  Controls have class = '0'.");
 			final Option<Integer> replicateCountOption = datasetParserTemplate.addIntegerOption('r', "replicateCount",
 					"Total number of replicate datasets generated from given model(s) to be randomly generated.");
-			final Option<String> datasetOutputFileOption = datasetParserTemplate
-					.addStringOption('o', "datasetOutputFile",
+			final Option<String> datasetOutputFileOption = datasetParserTemplate.addStringOption('o', "datasetOutputFile",
 							"Output file name/path.  This parameter is used for -D to specify how dataset files are saved, and how they will be named.");
-
 			final Option<Boolean> createContinuousEndpointsOption = datasetParserTemplate.addBooleanOption('c', "continuous",
 					"Directs algorithm to generate datasets with continuous-valued endpoints rather than binary discrete datasets.");
-
 			final Option.EnumParserOption<MIXED_MODEL_DATASET_TYPE> heterogeneousOptionLocal = new Option.EnumParserOption<MIXED_MODEL_DATASET_TYPE>(
 					'h', "mixedModelDatasetType", "if there are multiple models use " + MIXED_MODEL_DATASET_TYPE.heterogeneous + " or "
 							+ MIXED_MODEL_DATASET_TYPE.hierarchical, MIXED_MODEL_DATASET_TYPE.class);
-
 			final Option<MIXED_MODEL_DATASET_TYPE> multipleModelDatasetType = datasetParserTemplate.addOption(heterogeneousOptionLocal);
-			
-			
 			final Option<Boolean> heterogeneousLabelBoolean = datasetParserTemplate.addBooleanOption('b', "heteroLabel", 
 					"Produce output datasets that include model labels in addition to normal output when working with heterogeneous data.");
-			
-			final Option<Double> continuousEndpointsStandardDeviationOption = datasetParserTemplate
-					.addDoubleOption(
-							'd',
-							"standardDeviation",
-							"The standard deviation around model penetrance values used to simulated continuous-valued endpoints.  Larger standard deviation values should yield noisier datasets, with a signal that is more difficult to detect.");
+			final Option<Double> continuousEndpointsStandardDeviationOption = datasetParserTemplate.addDoubleOption('d', "standardDeviation",
+					"The standard deviation around model penetrance values used to simulated continuous-valued endpoints. Larger standard deviation values should yield noisier datasets, with a signal that is more difficult to detect.");
 			final String minMaxDescription = "Minimum and maximum determine the range that model penetrance values are mapped to. Because of statistical sampling, based on the magnitude of the standard deviation, some points will be outside this range.";
 
+			// Initialize a new CmdLineParserSrc that will read in variable options related to the model
 			final CmdLineParserSrc modelParserTemplate = new CmdLineParserSrc();
 			final Option<Double> modelHeritabilityOption = modelParserTemplate.addDoubleOption('h', "heritability",
 					"Specifies the heritability of a given model.");
 			final Option<Double> modelPrevalenceOption = modelParserTemplate.addDoubleOption('p', "caseProportion",
 					"Specifies the caseProportion of a given model.");
-			final Option<Boolean> modelOddsRatioOption = modelParserTemplate
-					.addBooleanOption(
-							'd',
-							"useOddsRatio",
+			final Option<Boolean> modelOddsRatioOption = modelParserTemplate.addBooleanOption('d', "useOddsRatio",
 							"Normally, the EDM difficulty model difficulty estimate is used to rank models for selection.  This parameter over-rides the default in favor of the COR difficulty estimate.");
-			final Option<Double> modelAttributeOption = modelParserTemplate
-					.addDoubleOption(
-							'a',
-							"attributeAlleleFrequency",
+			final Option<Double> modelAttributeOption = modelParserTemplate.addDoubleOption('a', "attributeAlleleFrequency",
 							"Specifies the minor allele frequency of a given attribute in a model.  The number of times this parameter is specified determines the number of attributes that are included in the model.  E.g. 2-locus, 3-locus, 4-locus models.");
-			final Option<String> modelOutputFileOption = modelParserTemplate
-					.addStringOption('o', "modelOutputFile",
+			final Option<String> modelOutputFileOption = modelParserTemplate.addStringOption('o', "modelOutputFile",
 							" Output file name/path.  This parameter is used for -M to specify how model files are saved, and how they will be named..");
-
+			
+			// Initialize a new CmdLineParserSrc that will hand variable options for both the model and the dataset
 			final CmdLineParserSrc parser = new CmdLineParserSrc();
 			final Option<CmdLineParserSrc> modelOption = parser.addOption(new Option.CmdLineParserOption('M', "model",
 					"Command to generate model(s) with specified model constraints", modelParserTemplate));
 			final Option<CmdLineParserSrc> datasetOption = parser.addOption(new Option.CmdLineParserOption('D', "dataset",
 					"Command to generate dataset(s) with specified dataset constraints.", datasetParserTemplate));
-
 			final Option<String> modelInputFileOption = parser.addStringOption('i', "modelInputFile",
 					"Path/Name of input model file used for generating dataset(s).");
-			final Option<Double> modelWeightOption = parser
-					.addDoubleOption(
-							'w',
-							"modelWeight",
+			final Option<Double> modelWeightOption = parser.addDoubleOption('w', "modelWeight",
 							"For each model, the relative weight compared to other models. If not specified all models will have equal weight. The weight/totalWeight determines the model fraction. The fraction is used in heterogeneous datasets to determine the # of rows generated from each model. In continuous hierarchical models, the fraction controls the relative contribution to the continuous endpoint. For discrete hierarchical models, weight is ignored. The order of the fractions is 1) new models and then 2) input models. ");
+			// TODO: include a description for predictiveInputFile
 			final Option<String> predictiveInputFileOption = parser.addStringOption('v', "predictiveInputFile", "???");
 			final Option<String> noiseInputFileOption = parser.addStringOption('z', "noiseInputFile",
 					"a file containing snps data. The number of rows will determine your dataset output size.");
-			final Option<Integer> rasQuantileCountOption = parser
-					.addIntegerOption('q', "rasQuantileCount",
+			final Option<Integer> rasQuantileCountOption = parser.addIntegerOption('q', "rasQuantileCount",
 							"Number of quantiles (i.e. number of models selected across a difficulty-ranked distribution) that will be saved to the model file.");
 			final Option<Integer> rasPopulationCountOption = parser.addIntegerOption('p', "rasPopulationCount",
 					"Number of models to be generated, from which representative 'quantile'-models will be selected and saved.");
 			final Option<Integer> rasTryCountOption = parser.addIntegerOption('t', "rasTryCount",
 					"Number of algorithmic attempts to generate a random model to satisfy parameter -p, before algorithm quits.");
-			final Option<Integer> randomSeedOption = parser
-					.addIntegerOption(
-							'r',
-							"randomSeed",
+			final Option<Integer> randomSeedOption = parser.addIntegerOption('r', "randomSeed",
 							"Seed for random number generator used to simulate models and datasets. If specified, repeated runs will generate identical outputs. In this way, a colleague could recreate your datasets without needing to transfer the actual files.");
 			final Option<Boolean> helpOption = parser.addBooleanOption('h', "help", "What you are reading now");
 
+			// Parse through the arguments
 			parser.parse(args);
 
 			showHelpObject = parser.getOptionValue(helpOption);
@@ -530,7 +513,7 @@ public class SnpGenDocument {
 				for (int modelCtr = 0; modelCtr < totalModels; ++modelCtr) {
 					modelFractions[modelCtr] = 1.0d / totalModels;
 				}
-			} else if (modelFractions.length != totalModels) {
+			} else if(modelFractions.length != totalModels) {
 				throw new IllegalArgumentException("# of models and # of dataset model fractions do not match! There are " + totalModels
 						+ " total models (" + modelOptionList.size() + " from new models and " + modelInputFileCount
 						+ " from model files) but --" + modelWeightOption.longForm + " has " + modelFractions.length
@@ -538,9 +521,8 @@ public class SnpGenDocument {
 						+ Arrays.toString(modelFractions));
 			}
 
-			if (showHelp) {
+			if(showHelp)
 				SnpGenDocument.printOptionHelp(parser);
-			}
 		}
 
 		runDocument = (!showHelp && !outShowGui);
@@ -610,9 +592,9 @@ public class SnpGenDocument {
 		Exception outEx = null;
 
 		outEx = verifyModelParameters();
-		if (outEx == null) {
+		if (outEx == null)
 			outEx = verifyDatasetParameters();
-		}
+
 		return outEx;
 	}
 
@@ -631,6 +613,7 @@ public class SnpGenDocument {
 				}
 			}
 		}
+		
 		return outEx;
 	}
 
