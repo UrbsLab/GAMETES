@@ -161,7 +161,7 @@ public class SnpGenSimulator {
 		if (inProgressHandler != null) {
 			int totalReplicateCount = 0;
 			for (final DocDataset dd : document.datasetList) {
-				//System.out.println("Current dd multipleModelDataType is " + dd.multipleModelDatasetType + ", line 164");
+				System.out.println("Current dd multipleModelDataType is " + dd.multipleModelDatasetType + ", line 164");
 				totalReplicateCount += dd.replicateCount.getInteger();
 			}
 			final int maxProgress = penetranceTableQuantiles.length * totalReplicateCount;
@@ -228,8 +228,10 @@ public class SnpGenSimulator {
 					
 					final StringBuilder header = new StringBuilder();
 					
+					System.out.println("Line 231 of SnpGenSimulator, model fractions are [" + document.modelFractions[0] + ", " + document.modelFractions[1] + "]");
 					assert q.tables.length == document.modelFractions.length : "q.tables.length =! document.modelFractions.length";
 
+					System.out.println("Current datasetIterationCount is " + whichDataset + " out of " + datasetIterationCount);
 					int[][] out = SnpGenSimulator.generateAndSaveDataset(random, predictiveDataset, noiseDataset, q.tables, dd, true, datasetFile,
 							header, document.modelFractions);
 					
@@ -241,6 +243,7 @@ public class SnpGenSimulator {
 					// If the heterogeneousLabelBoolean is selected, and we're not creating additive data,
 					// and we have multiple models selected, then we'll call our function "addModelLabelToHeterogeneousOutput". 
 					// This creates a new output file for each output file that has model labels as the first column
+					
 					if(dd.heterogeneousLabelBoolean.toString().equals("true") && 
 					   !dd.multipleModelDatasetType.toString().equals("hierarchical") &&
 					   document.modelFractions.length > 1) {
@@ -975,6 +978,8 @@ public class SnpGenSimulator {
 				final int caseCount = (int) Math.round(dd.caseProportion.value * instanceCount);
 				final int controlCount = instanceCount - caseCount;
 				
+				System.out.println("In generateAndSaveDatasets, the multipleModelType is " + dd.multipleModelDatasetType);
+				
 				// write out all the cases
 				SnpGenSimulator.printInstances(dd, inRandom, inPredictiveDataset, inNoiseDataset, 0, inTables,
 						attributeCountNoiseGenerated,
@@ -1148,6 +1153,10 @@ public class SnpGenSimulator {
 			// inInstanceClass (a kluge).
 
 			double phenotypeValue = 0.0;
+			
+			// TODO: TRYING TO FIGURE OUT DIFFERENCE BETWEEN COMMANDLINE AND UI
+			//heterogeneousCurrentTable = 0;
+			//heterogeneousCurrentTable = 1-heterogeneousCurrentTable;
 			
 			// Generate values for each of the model columns
 			for (int whichTable = 0; whichTable < inTables.length; ++whichTable) {

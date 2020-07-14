@@ -568,6 +568,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         Exception paramError;
         try {
             documentLink.guiToDocument();
+            
             final SnpGenDocument document = documentLink.getDocument();
             if ((paramError = document.verifyAllNeededParameters()) != null) {
                 throw paramError;
@@ -582,8 +583,11 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
                 // simulator.setProgressHandler(progressor);
                 simulator.setDocument(document);
                 final ArrayList<SnpGenDocument.DocModel> selectedModels = getSelectedModels();
-                // simulator.combineModelTablesIntoQuantiles(document.modelList,
-                // document.inputFiles, document.inputFileFractions);
+                
+                // Print out what the models are and what kind of dataset we're making out of them
+                //System.out.println(document.datasetList[0].multipleModelDatasetType);
+                
+                // simulator.combineModelTablesIntoQuantiles(document.modelList, document.inputFiles, document.inputFileFractions);
                 simulator.combineModelTablesIntoQuantiles(selectedModels, document.modelInputFiles);
                 final SwingWorker<Exception, Void> worker = new SwingWorker<Exception, Void>() {
                     @Override
@@ -614,6 +618,52 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             handleException(ex);
         }
     }
+    
+    
+    
+    private void generateDatasetsVivek() {
+        Exception paramError;
+        try {
+            documentLink.guiToDocument();
+            final SnpGenDocument document = documentLink.getDocument();
+            
+            if ((paramError = document.verifyAllNeededParameters()) != null) {
+                throw paramError;
+            }
+            
+            final File outputFile = chooseFile(frame, "Location for generated datasets");
+            if (outputFile != null) {
+                for (final SnpGenDocument.DocDataset dataset : document.datasetList) {
+                    dataset.outputFile = outputFile;
+                }
+                
+                // Initialize a new SnpGenSimulator
+                final SnpGenSimulator simulator = new SnpGenSimulator();
+                
+                // Set the simulator's SnpGenDocument to be "inDocument"
+                simulator.setDocument(document);
+                
+                // Get the desired quantile count and the list of models from the inDocument
+                final int desiredQuantileCount = document.rasQuantileCount.getInteger();
+                final ArrayList<DocModel> modelList = document.modelList;
+                
+                // Generate models based upon the model list and the quantile count
+                final double[][] allTableScores = simulator.generateTablesForModels(modelList, desiredQuantileCount,
+                        document.rasPopulationCount.getInteger(), document.rasTryCount.getInteger(), null);
+                
+                // Write tables and scores, combine the tables into quantiles, and generate the appropriate datasets
+                simulator.writeTablesAndScoresToFile(modelList, allTableScores, desiredQuantileCount);
+                simulator.combineModelTablesIntoQuantiles(modelList, document.modelInputFiles);
+                simulator.generateDatasets(null);
+            }  
+        } catch (final Exception ex) {
+        	System.err.println(ex.getMessage());
+            ex.printStackTrace();
+        }
+                        
+    }
+            
+          
 
     /* Function: generateSnpModel
      * Input: N/A
@@ -763,13 +813,22 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
                 final DocModel model = document.getModel(s);
                 outModels.add(model);
                 final double modelWeight = model.fraction.value;
-                totalWeight = modelWeight;
+                //totalWeight = modelWeight;
+                totalWeight = totalWeight + modelWeight;
                 modelWeights[outModels.size() - 1] = modelWeight;
             }
+            
+            if(modelWeights.length > 1)
+            	System.out.println("Line 819 of SnpGenMainWindow: modelWeights is [" + modelWeights[0] + ", " + modelWeights[1] + "]");
+
             document.modelFractions = new double[modelWeights.length];
             for (int modelIndex = 0; modelIndex < modelWeights.length; ++modelIndex) {
                 document.modelFractions[modelIndex] = modelWeights[modelIndex] / totalWeight;
             }
+            
+            if(document.modelFractions.length > 1)
+            	System.out.println("Line 825 of SnpGenMainWindow: modelFractions is [" + document.modelFractions[0] + ", " + document.modelFractions[1] + "]");
+
         }
         return outModels;
     }
@@ -1031,7 +1090,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         
         // If we're going into the GUI...
         if (showGui) {
-            System.out.println("Going into GUI!");
+            System.out.println("Going into GUI of SRC!");
             // Initialize a dataset to contain required info
             doc.createFirstDataset();
             // TODO: figure out what the "createAndShowGui" function does
@@ -1041,7 +1100,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         // If we're not going into the GUI and we're not calling help...
         if (runDocument) {
             // Initialize a dataset to contain required info
-            doc.createFirstDataset();
+            //doc.createFirstDataset();
             SnpGenMainWindow.runDocument(doc);
         }
     }
@@ -1326,7 +1385,11 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             
             add(new NonPredictiveAttributesPanel());
 
-            add(new EndpointTypePanel());
+            // Initialize the EndpointTypePanel first and THEN add the object
+            EndpointTypePanel endPointTypePanelYeet = new EndpointTypePanel();
+            add(endPointTypePanelYeet);
+            //add(new EndpointTypePanel());
+            
 
             datasetControlPanel = new DatasetReplicateCountPanel();
             add(datasetControlPanel, BorderLayout.CENTER);
@@ -1543,8 +1606,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             });
         }
 
-        void setFixedOrVariableNumberOfSamples(
-                final SnpGenMainWindow.FIXED_OR_VARIABLE_NUMBER_OF_SAMPLES fixedOrVariableSize) {
+        void setFixedOrVariableNumberOfSamples(final SnpGenMainWindow.FIXED_OR_VARIABLE_NUMBER_OF_SAMPLES fixedOrVariableSize) {
             binaryCardLayout.show(binaryCards, fixedOrVariableSize.toString());
         }
 
