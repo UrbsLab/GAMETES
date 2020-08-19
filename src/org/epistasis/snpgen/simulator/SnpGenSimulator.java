@@ -228,10 +228,10 @@ public class SnpGenSimulator {
 					
 					final StringBuilder header = new StringBuilder();
 					
-					System.out.println("Line 231 of SnpGenSimulator, model fractions are [" + document.modelFractions[0] + ", " + document.modelFractions[1] + "]");
+					//System.out.println("Line 231 of SnpGenSimulator, model fractions are [" + document.modelFractions[0] + ", " + document.modelFractions[1] + "]");
 					assert q.tables.length == document.modelFractions.length : "q.tables.length =! document.modelFractions.length";
 
-					System.out.println("Current datasetIterationCount is " + whichDataset + " out of " + datasetIterationCount);
+					//System.out.println("Current datasetIterationCount is " + whichDataset + " out of " + datasetIterationCount);
 					int[][] out = SnpGenSimulator.generateAndSaveDataset(random, predictiveDataset, noiseDataset, q.tables, dd, true, datasetFile,
 							header, document.modelFractions);
 					

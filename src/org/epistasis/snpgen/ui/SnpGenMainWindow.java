@@ -376,12 +376,8 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
      * Input: N/A
      * Output: N/A
      * ----------------------------------------------------------------
-     * Description: Convert the documentLinkt to a GUI, and then create
+     * Description: Convert the documentLink to a GUI, and then create
      *  a new JFRAME, showing the GUI
-     * 
-     * 
-     * Original comment: Create the GUI and show it. For thread safety, this
-     *  method should be invoked from the event-dispatching thread.
      */
     private void createAndShowGUI() {
         try {
@@ -390,7 +386,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         } catch (final IllegalAccessException iea) {
         }
 
-        // Initialize a new JFrame
+        // Initialize a new JFrame and update information based upon the input
         frame = new JFrame("GAMETES 2.2 dev");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setContentPane(createContentPane());
@@ -562,17 +558,24 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
      * Input: N/A
      * Output: N/A
      * ----------------------------------------------------------------
-     * Description: 
+     * Description: Function to generate datasets given use of the
+     *   GAMETES GUI.
      */
     private void generateDatasets() {
         Exception paramError;
         try {
+        	// Get information from the GUI and save it into the document
             documentLink.guiToDocument();
             
+            // Get the document corresponding to the current SnpGenMainWindow
             final SnpGenDocument document = documentLink.getDocument();
+            
+            // Make sure all needed parameters are present
             if ((paramError = document.verifyAllNeededParameters()) != null) {
                 throw paramError;
             }
+            
+            // Save out the output file locations for our datasets
             final File outputFile = chooseFile(frame, "Location for generated datasets");
             if (outputFile != null) {
                 for (final SnpGenDocument.DocDataset dataset : document.datasetList) {
@@ -581,12 +584,12 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
 
                 final ProgressDialog progressor = new ProgressDialog("Saving datasets...");
                 // simulator.setProgressHandler(progressor);
+                
+                // Set the document of the simulator and get the models from our input
                 simulator.setDocument(document);
                 final ArrayList<SnpGenDocument.DocModel> selectedModels = getSelectedModels();
-                
-                // Print out what the models are and what kind of dataset we're making out of them
-                //System.out.println(document.datasetList[0].multipleModelDatasetType);
-                
+                                   
+                // Combine the model tables into quantiles and generate datasets
                 // simulator.combineModelTablesIntoQuantiles(document.modelList, document.inputFiles, document.inputFileFractions);
                 simulator.combineModelTablesIntoQuantiles(selectedModels, document.modelInputFiles);
                 final SwingWorker<Exception, Void> worker = new SwingWorker<Exception, Void>() {
@@ -618,52 +621,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             handleException(ex);
         }
     }
-    
-    
-    
-    private void generateDatasetsVivek() {
-        Exception paramError;
-        try {
-            documentLink.guiToDocument();
-            final SnpGenDocument document = documentLink.getDocument();
-            
-            if ((paramError = document.verifyAllNeededParameters()) != null) {
-                throw paramError;
-            }
-            
-            final File outputFile = chooseFile(frame, "Location for generated datasets");
-            if (outputFile != null) {
-                for (final SnpGenDocument.DocDataset dataset : document.datasetList) {
-                    dataset.outputFile = outputFile;
-                }
-                
-                // Initialize a new SnpGenSimulator
-                final SnpGenSimulator simulator = new SnpGenSimulator();
-                
-                // Set the simulator's SnpGenDocument to be "inDocument"
-                simulator.setDocument(document);
-                
-                // Get the desired quantile count and the list of models from the inDocument
-                final int desiredQuantileCount = document.rasQuantileCount.getInteger();
-                final ArrayList<DocModel> modelList = document.modelList;
-                
-                // Generate models based upon the model list and the quantile count
-                final double[][] allTableScores = simulator.generateTablesForModels(modelList, desiredQuantileCount,
-                        document.rasPopulationCount.getInteger(), document.rasTryCount.getInteger(), null);
-                
-                // Write tables and scores, combine the tables into quantiles, and generate the appropriate datasets
-                simulator.writeTablesAndScoresToFile(modelList, allTableScores, desiredQuantileCount);
-                simulator.combineModelTablesIntoQuantiles(modelList, document.modelInputFiles);
-                simulator.generateDatasets(null);
-            }  
-        } catch (final Exception ex) {
-        	System.err.println(ex.getMessage());
-            ex.printStackTrace();
-        }
-                        
-    }
-            
-          
+                 
 
     /* Function: generateSnpModel
      * Input: N/A
@@ -818,17 +776,10 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
                 modelWeights[outModels.size() - 1] = modelWeight;
             }
             
-            if(modelWeights.length > 1)
-            	System.out.println("Line 819 of SnpGenMainWindow: modelWeights is [" + modelWeights[0] + ", " + modelWeights[1] + "]");
-
             document.modelFractions = new double[modelWeights.length];
             for (int modelIndex = 0; modelIndex < modelWeights.length; ++modelIndex) {
                 document.modelFractions[modelIndex] = modelWeights[modelIndex] / totalWeight;
             }
-            
-            if(document.modelFractions.length > 1)
-            	System.out.println("Line 825 of SnpGenMainWindow: modelFractions is [" + document.modelFractions[0] + ", " + document.modelFractions[1] + "]");
-
         }
         return outModels;
     }
@@ -1059,8 +1010,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
      * Input: N/A
      * Output: N/A
      * ----------------------------------------------------------------
-     * Description: Does nothing?
-     * TODO: figure out what this function does... 
+     * Description: Does nothing
      */
     private void viewDataFile() {
     }
@@ -1068,9 +1018,9 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
     
     /* Function: main
      * Input: N/A
-     * Output: 
+     * Output: N/A
      * ----------------------------------------------------------------
-     * Description: 
+     * Description: Reads input arguments and performs GAMETES simulation
      */
     public static void main(final String[] args) {
     	// Initialize a new SnpGenDocument
@@ -1088,19 +1038,17 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         // Boolean that tells us if the software is being run with normal arguments (no help and no GUI)
         final boolean runDocument = doc.runDocument;
         
-        // If we're going into the GUI...
+        // If we're going into the GUI
         if (showGui) {
-            System.out.println("Going into GUI of SRC!");
-            // Initialize a dataset to contain required info
+            System.out.println("Going into GUI!");
+            // Initialize an empty dataset to contain required info
             doc.createFirstDataset();
-            // TODO: figure out what the "createAndShowGui" function does
+            // Go into the createAndShowGui function (gets input from the UI and performs GAMETES)
             SnpGenMainWindow.createAndShowGui(doc);
         }
 
-        // If we're not going into the GUI and we're not calling help...
+        // If we're not going into the GUI and we're not calling help, we run GAMETES based upon our input
         if (runDocument) {
-            // Initialize a dataset to contain required info
-            //doc.createFirstDataset();
             SnpGenMainWindow.runDocument(doc);
         }
     }
@@ -1169,7 +1117,8 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
      * Input: SnpGenDocument inSnpGenDocument
      * Output: N/A
      * ----------------------------------------------------------------
-     * Description: Take the input SnpGenDocument, convert it to an
+     * Description: Function to run GAMETES given input from the UI.
+     *  Take the input SnpGenDocument, convert it to an
      *  object of type SnpGenMainWindow, and run the "createAndShowGUI"
      *  function
      */
@@ -1191,12 +1140,12 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
      * Input: SnpGenDocument inDocument
      * Output: N/A
      * ----------------------------------------------------------------
-     * Description: Function to run GAMETES given an input document.
+     * Description: Function to run GAMETES given input arguments.
      *  We verify that we have the required parameters to run GAMETES,
      *  then we create a new SnpGenSimulator whose document is our
      *  input document. Getting the quantile count and list of models
      *  from this document, we generate model tables, convert them
-     *  into quantiles, and produce resulting datasets
+     *  into quantiles, and produce resulting datasets.
      */
     private static void runDocument(final SnpGenDocument inDocument) {
         Exception paramError;
@@ -1549,7 +1498,6 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
                 public void actionPerformed(final ActionEvent e) {
                     // If the binary class button is picked, show the relevant values and update the GUI based upon the
                     //    current data
-                    // System.out.println("Based upon the UI, we're doing binary");
                     endpointCardLayout.show(endpointTypeCards, SnpGenMainWindow.ENDPOINT_TYPES.BINARY_CLASS.toString());
                     getDocument().firstDataset.createContinuousEndpoints.setValue(Boolean.FALSE);
                     fixedSampleNumberCaseControlPanel.updateGuiToData();
@@ -1572,7 +1520,6 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             heteroButton.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(final ActionEvent e) {
-                    // System.out.println("Based upon the UI, multipleModelType should be heterogeneous");
                     heteroLabelsCheckbox.setEnabled(true);                    
                     getDocument().firstDataset.multipleModelDatasetType.setValue(MIXED_MODEL_DATASET_TYPE.heterogeneous);
                 }
@@ -1582,7 +1529,6 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             additiveButton.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(final ActionEvent e) {
-                    // System.out.println("Based upon the UI, multipleModelType should be additive/hierarchical");
                     heteroLabelsCheckbox.setEnabled(false);                    
                     getDocument().firstDataset.multipleModelDatasetType.setValue(MIXED_MODEL_DATASET_TYPE.hierarchical);
                 }
@@ -1591,9 +1537,7 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
             // Adding hetero checkbox
             heteroLabelsCheckbox.addActionListener(new ActionListener() {
             	@Override
-                public void actionPerformed(final ActionEvent e) {
-                    // System.out.println("Based upon the UI, we want to print model types for heterogeneous models");
-            		
+                public void actionPerformed(final ActionEvent e) {            		
             		// Use the "activate" boolean to make sure the checkbox can be turned on or off
             		if(activate) {
                         getDocument().firstDataset.heterogeneousLabelBoolean.setValue(Boolean.TRUE);

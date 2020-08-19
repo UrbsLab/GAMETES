@@ -22,7 +22,6 @@ public class SnpGenDocument {
 	public static final Integer kDefaultReplicateCount = 100;
 	public static final Integer kDefaultRasQuantileCount = 3;
 	public static final Integer kDefaultRasPopulationCount = 1000;
-	//public static final Integer kDefaultRasTryCount = 50000;
 	public static final Integer kDefaultRasTryCount = 100000;
 	public static final Double kDefaultModelFraction = 1.0;
 	public static final Double kDefaultDatasetCaseProportion = 0.5;
@@ -34,14 +33,9 @@ public class SnpGenDocument {
 	public static final DecimalFormat kDecimalFormatTenDecimals = new DecimalFormat("#.##########");
 	private static final String kDefaultAttributeNameBase = "P";
 	
-	
 	private static final Boolean kDefaultHeterogeneousLabelBoolean = Boolean.FALSE;
-	//private final Boolean kDefaultHeterogeneousLabelBoolean = Boolean.FALSE;
 
-	// Public so that we can access the multiple model type
-	//public final MIXED_MODEL_DATASET_TYPE kDefaultMultipleModelDatasetType = MIXED_MODEL_DATASET_TYPE.hierarchical;
 	public static final MIXED_MODEL_DATASET_TYPE kDefaultMultipleModelDatasetType = MIXED_MODEL_DATASET_TYPE.hierarchical;
-	//public static final MIXED_MODEL_DATASET_TYPE kDefaultMultipleModelDatasetType = MIXED_MODEL_DATASET_TYPE.heterogeneous;
 
 	private int nextModelNumber;
 	private final ArrayList<DocListener> listeners;
