@@ -978,7 +978,7 @@ public class SnpGenSimulator {
 				final int caseCount = (int) Math.round(dd.caseProportion.value * instanceCount);
 				final int controlCount = instanceCount - caseCount;
 				
-				System.out.println("In generateAndSaveDatasets, the multipleModelType is " + dd.multipleModelDatasetType);
+				//System.out.println("In generateAndSaveDatasets, the multipleModelType is " + dd.multipleModelDatasetType);
 				
 				// write out all the cases
 				SnpGenSimulator.printInstances(dd, inRandom, inPredictiveDataset, inNoiseDataset, 0, inTables,
