@@ -1058,7 +1058,6 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
      * Output: JComponent outComp
      * ----------------------------------------------------------------
      * Description: Adds an extra component when including labels for models or datasets
-     * TODO: figure out exactly what this function does...
      */
     // WARNING: If you change the relationship of inClass to the class of the
     // output JComponent, be sure to update the createBacked<whatever> methods above.
@@ -1902,7 +1901,6 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
         BackedTextField standardDeviationField;
 
         public QuantitativePanel() {
-            // TODO figure out how to get items aligned in vertical center
             totalCountField = addBackedInteger(this, getDocument().firstDataset.totalCount, 3,
                     "Total number of samples:");
             totalCountField.setText(SnpGenDocument.kDefaultTotalCount.toString());

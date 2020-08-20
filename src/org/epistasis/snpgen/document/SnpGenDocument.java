@@ -15,7 +15,7 @@ import org.epistasis.snpgen.simulator.PenetranceTable;
 public class SnpGenDocument {
 	public static final Double kDefaultFrequencyMin = 0.01;
 	public static final Double kDefaultFrequencyMax = 0.5;
-	public static final Double kDefaultMissingValueRate = 0.0;
+	//public static final Double kDefaultMissingValueRate = 0.0;
 	public static final Integer kDefaultAtrributeCount = 100;
 	public static final Integer kDefaultCaseCount = 400;
 	public static final Integer kDefaultControlCount = 400;
@@ -43,7 +43,7 @@ public class SnpGenDocument {
 	public double[] modelFractions = null;
 
 	public DocBoolean generateReplicates;
-	public DocBoolean includeMissingValues;
+	//public DocBoolean includeMissingValues;
 	public DocBoolean caseControlRatioBalanced;
 	public DocInteger replicateCount;
 	public DocInteger rasQuantileCount;
@@ -69,7 +69,7 @@ public class SnpGenDocument {
 		setNextModelNumber(1);
 		randomSeed = null;
 		modelInputFiles = new File[0];
-		includeMissingValues = new DocBoolean();
+		//includeMissingValues = new DocBoolean();
 		caseControlRatioBalanced = new DocBoolean();
 		generateReplicates = new DocBoolean();
 		rasQuantileCount = new DocInteger();
@@ -285,33 +285,33 @@ public class SnpGenDocument {
 			final CmdLineParserSrc datasetParserTemplate = new CmdLineParserSrc();
 			// Input options for the command-line
 			final Option<Double> alleleFrequencyMinOption = datasetParserTemplate.addDoubleOption('n', "alleleFrequencyMin",
-					"Minimum minor allele frequency for randomly generated, non-predictive attributes in datasets.");
+					"Minimum minor allele frequency for randomly generated, non-predictive attributes in datasets. (default value: 0.01)");
 			final Option<Double> alleleFrequencyMaxOption = datasetParserTemplate.addDoubleOption('x', "alleleFrequencyMax",
-					"Maximum minor allele frequency for randomly generated, non-predictive attributes in datasets.");
+					"Maximum minor allele frequency for randomly generated, non-predictive attributes in datasets. (default value: 0.05)");
 			final Option<Integer> totalAttributeCountOption = datasetParserTemplate.addIntegerOption('a', "totalAttributeCount",
-					"Total number of attributes to be generated in simulated dataset(s).");
-			final Option<Double> missingValueRateOption = datasetParserTemplate.addDoubleOption('m', "missingValueRate", "???");
+					"Total number of attributes to be generated in simulated dataset(s). (default value: 100)");
+			//final Option<Double> missingValueRateOption = datasetParserTemplate.addDoubleOption('m', "missingValueRate", "???");
 			final Option<Integer> totalCountOption = datasetParserTemplate.addIntegerOption('t', "totalCount",
-					"(continuous data only) How many samples to generate for each dataset.");
+					"(continuous data only) How many samples to generate for each dataset. (default value: 800)");
 			final Option<Integer> caseCountOption = datasetParserTemplate.addIntegerOption('s', "caseCount",
-					"(discrete data only) Number of case instances in simulated dataset(s).  Cases have class = '1'.");
+					"(discrete data only) Number of case instances in simulated dataset(s). Cases have class = '1'. (default value: 400)");
 			final Option<Integer> controlCountOption = datasetParserTemplate.addIntegerOption('w', "controlCount",
-							"(discrete data only) Number of control instances in simulated dataset(s).  Controls have class = '0'.");
+							"(discrete data only) Number of control instances in simulated dataset(s). Controls have class = '0'. (default value: 400)");
 			final Option<Integer> replicateCountOption = datasetParserTemplate.addIntegerOption('r', "replicateCount",
-					"Total number of replicate datasets generated from given model(s) to be randomly generated.");
+					"Total number of replicate datasets generated from given model(s) to be randomly generated. (default value: 100)");
 			final Option<String> datasetOutputFileOption = datasetParserTemplate.addStringOption('o', "datasetOutputFile",
 							"Output file name/path.  This parameter is used for -D to specify how dataset files are saved, and how they will be named.");
 			final Option<Boolean> createContinuousEndpointsOption = datasetParserTemplate.addBooleanOption('c', "continuous",
-					"Directs algorithm to generate datasets with continuous-valued endpoints rather than binary discrete datasets.");
+					"Directs algorithm to generate datasets with continuous-valued endpoints rather than binary discrete datasets. (default value: false)");
 			final Option.EnumParserOption<MIXED_MODEL_DATASET_TYPE> heterogeneousOptionLocal = new Option.EnumParserOption<MIXED_MODEL_DATASET_TYPE>(
 					'h', "mixedModelDatasetType", "if there are multiple models use " + MIXED_MODEL_DATASET_TYPE.heterogeneous + " or "
 							+ MIXED_MODEL_DATASET_TYPE.hierarchical, MIXED_MODEL_DATASET_TYPE.class);
 			final Option<MIXED_MODEL_DATASET_TYPE> multipleModelDatasetType = datasetParserTemplate.addOption(heterogeneousOptionLocal);
 			final Option<Boolean> heterogeneousLabelBoolean = datasetParserTemplate.addBooleanOption('b', "heteroLabel", 
-					"Produce output datasets that include model labels in addition to normal output when working with heterogeneous data.");
+					"Produce output datasets that include model labels in addition to normal output when working with heterogeneous data. (default value: false)");
 			final Option<Double> continuousEndpointsStandardDeviationOption = datasetParserTemplate.addDoubleOption('d', "standardDeviation",
-					"The standard deviation around model penetrance values used to simulated continuous-valued endpoints. Larger standard deviation values should yield noisier datasets, with a signal that is more difficult to detect.");
-			final String minMaxDescription = "Minimum and maximum determine the range that model penetrance values are mapped to. Because of statistical sampling, based on the magnitude of the standard deviation, some points will be outside this range.";
+					"The standard deviation around model penetrance values used to simulated continuous-valued endpoints. Larger standard deviation values should yield noisier datasets, with a signal that is more difficult to detect. (default value: 0.02)");
+			//final String minMaxDescription = "Minimum and maximum determine the range that model penetrance values are mapped to. Because of statistical sampling, based on the magnitude of the standard deviation, some points will be outside this range.";
 
 			// Initialize a new CmdLineParserSrc that will read in variable options related to the model
 			final CmdLineParserSrc modelParserTemplate = new CmdLineParserSrc();
@@ -324,7 +324,7 @@ public class SnpGenDocument {
 			final Option<Double> modelAttributeOption = modelParserTemplate.addDoubleOption('a', "attributeAlleleFrequency",
 							"Specifies the minor allele frequency of a given attribute in a model.  The number of times this parameter is specified determines the number of attributes that are included in the model.  E.g. 2-locus, 3-locus, 4-locus models.");
 			final Option<String> modelOutputFileOption = modelParserTemplate.addStringOption('o', "modelOutputFile",
-							" Output file name/path.  This parameter is used for -M to specify how model files are saved, and how they will be named..");
+							" Output file name/path.  This parameter is used for -M to specify how model files are saved, and how they will be named.");
 			
 			// Initialize a new CmdLineParserSrc that will hand variable options for both the model and the dataset
 			final CmdLineParserSrc parser = new CmdLineParserSrc();
@@ -336,10 +336,9 @@ public class SnpGenDocument {
 					"Path/Name of input model file used for generating dataset(s).");
 			final Option<Double> modelWeightOption = parser.addDoubleOption('w', "modelWeight",
 							"For each model, the relative weight compared to other models. If not specified all models will have equal weight. The weight/totalWeight determines the model fraction. The fraction is used in heterogeneous datasets to determine the # of rows generated from each model. In continuous hierarchical models, the fraction controls the relative contribution to the continuous endpoint. For discrete hierarchical models, weight is ignored. The order of the fractions is 1) new models and then 2) input models. ");
-			// TODO: include a description for predictiveInputFile
-			final Option<String> predictiveInputFileOption = parser.addStringOption('v', "predictiveInputFile", "???");
+			final Option<String> predictiveInputFileOption = parser.addStringOption('v', "predictiveInputFile", "string a file containing snps data corresponding to predictive attributes. Rows correspond to number of instances while columns correspond to attributes. The last column of the input file corresponds to classification (case or control). There should not be a header in the file.");
 			final Option<String> noiseInputFileOption = parser.addStringOption('z', "noiseInputFile",
-					"a file containing snps data. The number of rows will determine your dataset output size.");
+					"string a file containing snps data corresponding to noisy attributes. Rows correspond to number of instances while columns correspond to attributes. There should not be a header in the file.");
 			final Option<Integer> rasQuantileCountOption = parser.addIntegerOption('q', "rasQuantileCount",
 							"Number of quantiles (i.e. number of models selected across a difficulty-ranked distribution) that will be saved to the model file.");
 			final Option<Integer> rasPopulationCountOption = parser.addIntegerOption('p', "rasPopulationCount",
@@ -409,8 +408,8 @@ public class SnpGenDocument {
 						SnpGenDocument.kDefaultFrequencyMax);
 				dataset.totalAttributeCount.setValue(datasetParser.getOptionValue(totalAttributeCountOption),
 						SnpGenDocument.kDefaultAtrributeCount);
-				dataset.missingValueRate.setValue(datasetParser.getOptionValue(missingValueRateOption),
-						SnpGenDocument.kDefaultMissingValueRate);
+				//dataset.missingValueRate.setValue(datasetParser.getOptionValue(missingValueRateOption),
+				//		SnpGenDocument.kDefaultMissingValueRate);
 				dataset.replicateCount.setValue(datasetParser.getOptionValue(replicateCountOption), SnpGenDocument.kDefaultReplicateCount);
 				dataset.createContinuousEndpoints.setValue(datasetParser.getOptionValue(createContinuousEndpointsOption),
 						SnpGenDocument.kDefaultCreateContinuousEndpoints);
@@ -694,7 +693,7 @@ public class SnpGenDocument {
 		public DocDouble alleleFrequencyMin;
 		public DocDouble alleleFrequencyMax;
 		public DocInteger totalAttributeCount;
-		public DocDouble missingValueRate;
+		//public DocDouble missingValueRate;
 		public DocDouble caseProportion;
 		public DocInteger replicateCount;
 		public File outputFile;
@@ -708,7 +707,7 @@ public class SnpGenDocument {
 			alleleFrequencyMin = new DocDouble(SnpGenDocument.kDefaultFrequencyMin);
 			alleleFrequencyMax = new DocDouble(SnpGenDocument.kDefaultFrequencyMax);
 			totalAttributeCount = new DocInteger(SnpGenDocument.kDefaultAtrributeCount);
-			missingValueRate = new DocDouble(SnpGenDocument.kDefaultMissingValueRate);
+			//missingValueRate = new DocDouble(SnpGenDocument.kDefaultMissingValueRate);
 			totalCount = new DocInteger(SnpGenDocument.kDefaultTotalCount);
 			caseProportion = new DocDouble(SnpGenDocument.kDefaultDatasetCaseProportion);
 			replicateCount = new DocInteger(SnpGenDocument.kDefaultReplicateCount);
