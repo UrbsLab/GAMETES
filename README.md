@@ -166,13 +166,21 @@ Please make sure to update tests as appropriate.
 **How to import GAMETES into Eclipse:**
 
 • Download the appropriate branch of GAMETES from GitHub.
+
 • Delete all existing .jar files in the GAMETES directory.
+
 • Launch Eclipse.
+
 • In Eclipse, click “File > Import".
+
 • Within the import box that opens up, open the “General” tab and click “Projects from Folder or Archive”. Then click “Next".
+
 • Click the “Directory” button next to the “Import source:” selection area, and navigate to the “src” folder of the GAMETES folder on your computer. Click “Open".
+
 • “src” should be selected because it’s the only folder you’ve picked. Click “Finish".
+
 • The GAMETES src folder should now be in your Package Explorer, ready to edit.
+
 • Open “src/org.epistasis.snpgen.ui/SnpGenMainWindow.java”. Clicking the green run arrow at the top of Eclipse for this file will successfully open up the GAMETES user interface.
 
 
