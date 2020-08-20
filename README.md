@@ -53,8 +53,8 @@ If there are no arguments, the User Interface will be opened. Here is a complete
 
 {-i,--modelInputFile} string Path/Name of input model file used for generating dataset(s).
 {-w,--modelWeight} double For each model, the relative weight compared to other models. If not specified all models will have equal weight. The weight/totalWeight determines the model fraction. The fraction is used in heterogeneous datasets to determine the # of rows generated from each model. In continuous hierarchical models, the fraction controls the relative contribution to the continuous endpoint. For discrete hierarchical models, weight is ignored. The order of the fractions is 1) new models and then 2) input models. 
-{-v,--predictiveInputFile} string ???
-{-z,--noiseInputFile} string a file containing snps data. The number of rows will determine your dataset output size.
+{-v,--predictiveInputFile} string a file containing snps data corresponding to predictive attributes. Rows correspond to number of instances while columns correspond to attributes. The last column of the input file corresponds to classification (case or control). There should not be a header in the file.
+{-z,--noiseInputFile} string a file containing snps data corresponding to noisy attributes. Rows correspond to number of instances while columns correspond to attributes. There should not be a header in the file.
 {-q,--rasQuantileCount} integer Number of quantiles (i.e. number of models selected across a difficulty-ranked distribution) that will be saved to the model file. (default value: 3).
 {-p,--rasPopulationCount} integer Number of models to be generated, from which representative 'quantile'-models will be selected and saved. (default value: 1000).
 {-t,--rasTryCount} integer Number of algorithmic attempts to generate a random model to satisfy parameter -p, before algorithm quits. (default value: 100000).
@@ -62,10 +62,7 @@ If there are no arguments, the User Interface will be opened. Here is a complete
 {-h,--help} <true if present, false otherwise> What you are reading now
 ```
 
-An example of generating a model file and associated datasets looks as follows: 
-
 The following are a series of examples for use of GAMETES to generate models and datasets.
-
 
 **Basic model generation**
 Here, we generate a single model using GAMETES. It has a heritability of 0.2, a case proportion of 30% compared to a control proprtion of 70%, two significant alleles driving the phenotype (one with a minor allele frequency (MAF) of 0.3 and the other with an MAF of 0.2). The model is saved as "basicModel". In attempting to generate the model, GAMETES will create a total of 1000 models, and then pick two of the models selected across the difficulty-ranked distrubtion of these models. It will perform 100,000 attempts to generate our desired random model before the algorithm quits.
@@ -169,21 +166,13 @@ Please make sure to update tests as appropriate.
 **How to import GAMETES into Eclipse:**
 
 • Download the appropriate branch of GAMETES from GitHub.
-
 • Delete all existing .jar files in the GAMETES directory.
-
 • Launch Eclipse.
-
 • In Eclipse, click “File > Import".
-
 • Within the import box that opens up, open the “General” tab and click “Projects from Folder or Archive”. Then click “Next".
-
 • Click the “Directory” button next to the “Import source:” selection area, and navigate to the “src” folder of the GAMETES folder on your computer. Click “Open".
-
 • “src” should be selected because it’s the only folder you’ve picked. Click “Finish".
-
 • The GAMETES src folder should now be in your Package Explorer, ready to edit.
-
 • Open “src/org.epistasis.snpgen.ui/SnpGenMainWindow.java”. Clicking the green run arrow at the top of Eclipse for this file will successfully open up the GAMETES user interface.
 
 
