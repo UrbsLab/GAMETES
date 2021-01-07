@@ -115,6 +115,14 @@ To generate continous endpointed data, we can make use of the "-c," "-d," and "-
 user:~$ java -jar gametes_2.2_dev.jar -M "-h 0.1 -p 0.5 -a 0.3 -a 0.1 -o model1Cont" -w 75 -M "-h 0.03 -p 0.5 -a 0.5 -a 0.5 -a 0.5 -o model2Cont" -w 25 -q 1 -D "-c -d 0.5 -t 100 -n 0.01 -x 0.5 -a 20 -r 1 -o contEndpointData"
 ```
 
+**Generating Datasets from Loaded Models**
+Previously generated models can be loaded into GAMETES for the creation of output data through the use of the "-i" tag. Here, we provide two examples of loading in pre-existing model files, first for the generation of heterogeneous output, and second for the generation of additive output.
+```console
+user:~$ java -jar gametes_2.2_dev.jar -i "../src/myModel_Models.txt" -i "../src/otherModel_Models.txt" -q 1 -D "-h heterogeneous -r 1 -o hetDataFromLoadedModels"
+
+user:~$ java -jar gametes_2.2_dev.jar -i "../src/myModel_Models.txt" -i "../src/otherModel_Models.txt" -q 1 -D "-h hierarchical -r 1 -o additiveDataFromLoadedModels"
+```
+
 For more examples of commands, refer to our User Guide.
 
 

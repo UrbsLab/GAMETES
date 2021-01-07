@@ -103,7 +103,8 @@ public class SnpGenMainWindow implements ModelTable.UpdateListener
      * Input: Container inContainer, DocModel inDocModel
      * Output: BackedModelUi outModelUi
      * ----------------------------------------------------------------
-     * Description: 
+     * Description:
+     * 
      */
     public BackedModelUi addBackedModel(final Container inContainer, final DocModel inDocModel) {
         final BackedModelUi outModelUi = new BackedModelUi();
