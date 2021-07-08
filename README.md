@@ -70,19 +70,19 @@ Here, we generate a single model using GAMETES. It has a heritability of 0.2, a 
 user:~$ java -jar gametes_2.2_dev.jar -M "-h 0.2 -p 0.3 -a 0.3 -a 0.2 -o basicModel" -q 2 -p 1000 -t 100000
 ```
 
-**Creating multiple models**
+### **Creating multiple models**
 We can create multiple models at once using the GAMETES software, by including them in a chain within our arguments. In this example, we generate two models, one named "basicModel1," with a heritability of 0.1, a case proportion of 50%, and a single influential attribute with minor allele frequency of 0.3. The other model, named "basicModel2," will have a heritability of 0.03, a case proportion of 50%, and a single influential attribute with minor allele frequency of 0.5. For both models, we specify a quantile count of 1, meaning that we return a single model in each case.
 ```console
 user:~$ java -jar gametes_2.2_dev.jar -M "-h 0.1 -p 0.5 -a 0.3 -o basicModel1" -M "-h 0.03 -p 0.5 -a 0.5 -o basicModel2" -q 1
 ```
 
-**Creating a model and dataset concurrently**
+### **Creating a model and dataset concurrently**
 GAMETES also allows users to generate models and datasets at the same time. In this example, we generate a single model with a heritability of 0.1, a case proportion of 50%, and a single influential attribute with minor allele frequency of 0.3. The datasets that are generated from this model will have a minimum minor allele frequency of 0.01, a maximum minor allele frequency of 0.5, 100 attributes, 500 cases, and 500 controls. There will be 10 replicates, and they will be saved in a folder titled "myData." An important point to note here is that the number of dataset directories will match the number of quantiles for the model.
 ```console
 user:~$ java -jar gametes_2.2_dev.jar -M " -h 0.2 -p 0.3 -a 0.3 -o modelForData" -q 1 -D "-n 0.01 -x 0.5 -a 100 -s 500 -w 500 -r 10 -o myData"
 ```
 
-**Creating a dataset based upon a loaded model**
+### **Creating a dataset based upon a loaded model**
 If the user has already created a model previously, it can be loaded to generate a dataset instead of having to be re-made. In this example, we load the model "myModel" from our GAMETES directory by calling "myModel_Models.txt, and then use it to create a new dataset directory called "dataLoadedFromModel" with a minimum MAF of 0.01, a maximum MAF of 0.5, 20 attributes, 50 cases, 50 controls, and 3 replicates.
 ```console
 user:~$ java -jar gametes_2.2_dev.jar -i "./modelForData_Models.txt" -D "-n 0.01 -x 0.5 -a 20 -s 50 -w 50 -r 3 -o dataLoadedFromModel"
@@ -91,31 +91,31 @@ user:~$ java -jar gametes_2.2_dev.jar -i "./modelForData_Models.txt" -D "-n 0.01
 New functionality in GAMETES v2.2 includes additive datasets, heterogenous datasets, both with and without model labels, and continuous endpoints. The following examples illustrate how to use these new features. 
 
 
-**Additive Datasets**
+### **Additive Datasets**
 The default behavior when providing multiple models to generate a single dataset will be the creation of additive, or hierarchical, data. In this case, we specify two models. The first one, saved as "model1Additive," has a heritability of 0.01, a case proportion of 0.5, and two significant alleles with MAF of 0.3 and 0.1 respectively. The second model, saved as "model2Additive," has a heritability of 0.03, a case proportion of 0.5, and three significant alleles each with an MAF of 0.5. The contribution of our models is weighted as well, so that the first model contributes 75% effect to the data, while the second model contributes 25%. These weight values can be expressed as full numbers or as decimals (i.e., to get a 3:1 weight, we could say 75/25, 3/1, .75/.25, etc.). The dataset generated from our two models is hierarchical, with a minimum minor allele frequency of 0.01, a maximum minor allele frequency of 0.5, 20 attributes, 800 cases, 800 controls, and a single replicate. This dataset is saved into an output folder named "additiveData."
 ```console
 user:~$ java -jar gametes_2.2_dev.jar -M "-h 0.1 -p 0.5 -a 0.3 -a 0.1 -o model1Additive" -w 75 -M "-h 0.03 -p 0.5 -a 0.5 -a 0.5 -a 0.5 -o model2Additive" -w 25 -q 1 -D "-h hierarchical -n 0.01 -x 0.5 -a 20 -s 800 -w 800 -r 1 -o additiveData"
 ```
 
-**Heterogenous Datasets**
+### **Heterogenous Datasets**
 To generate a heterogeneous dataset, we can use the same format of command that we used for our additive output, and then simply change the "-h" argument.
 ```console
 user:~$ java -jar gametes_2.2_dev.jar -M "-h 0.1 -p 0.5 -a 0.3 -a 0.1 -o model1Het" -w 75  -M "-h 0.03 -p 0.5 -a 0.5 -a 0.5 -a 0.5 -o model2Het" -w 25 -q 1 -D "-h heterogeneous -n 0.01 -x 0.5 -a 20 -s 800 -w 800 -r 1 -o heterogeneousData"
 ```
 
-**Heterogenous Datasets (with model labels)**
+### **Heterogenous Datasets (with model labels)**
 To generate a heterogeneous dataset that includes labels corresponding to which model represents the main source of signal for each sample in output, we use the same heterogeneous command as before, and then include the "-b" tag.
 ```console
 user:~$ java -jar gametes_2.2_dev.jar -M "-h 0.1 -p 0.5 -a 0.3 -a 0.1 -o model1HetWithLabel" -w 75  -M "-h 0.03 -p 0.5 -a 0.5 -a 0.5 -a 0.5 -o model2HetWithLabel" -w 25 -q 1 -D "-h heterogeneous -b -n 0.01 -x 0.5 -a 20 -s 800 -w 800 -r 1 -o heterogeneousDataWithLabels"
 ```
 
-**Continuous Endpoints**
+### **Continuous Endpoints**
 To generate continous endpointed data, we can make use of the "-c," "-d," and "-t" tags. "-c" specifies that we want continuous output, "-d" will specify a standard deviation for our continuous outputs (in this case 0.5), and "-t" will specify the number of samples in our output (in this case, 100).
 ```console
 user:~$ java -jar gametes_2.2_dev.jar -M "-h 0.1 -p 0.5 -a 0.3 -a 0.1 -o model1Cont" -w 75 -M "-h 0.03 -p 0.5 -a 0.5 -a 0.5 -a 0.5 -o model2Cont" -w 25 -q 1 -D "-c -d 0.5 -t 100 -n 0.01 -x 0.5 -a 20 -r 1 -o contEndpointData"
 ```
 
-**Generating Datasets from Loaded Models**
+### **Generating Datasets from Loaded Models**
 Previously generated models can be loaded into GAMETES for the creation of output data through the use of the "-i" tag. Here, we provide two examples of loading in pre-existing model files, first for the generation of heterogeneous output, and second for the generation of additive output.
 ```console
 user:~$ java -jar gametes_2.2_dev.jar -i "../src/myModel_Models.txt" -i "../src/otherModel_Models.txt" -q 1 -D "-h heterogeneous -r 1 -o hetDataFromLoadedModels"
