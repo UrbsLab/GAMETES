@@ -64,7 +64,7 @@ If there are no arguments, the User Interface will be opened. Here is a complete
 
 The following are a series of examples for use of GAMETES to generate models and datasets.
 
-**Basic model generation**
+### **Basic model generation**
 Here, we generate a single model using GAMETES. It has a heritability of 0.2, a case proportion of 30% compared to a control proprtion of 70%, two significant alleles driving the phenotype (one with a minor allele frequency (MAF) of 0.3 and the other with an MAF of 0.2). The model is saved as "basicModel". In attempting to generate the model, GAMETES will create a total of 1000 models, and then pick two of the models selected across the difficulty-ranked distrubtion of these models. It will perform 100,000 attempts to generate our desired random model before the algorithm quits.
 ```console
 user:~$ java -jar gametes_2.2_dev.jar -M "-h 0.2 -p 0.3 -a 0.3 -a 0.2 -o basicModel" -q 2 -p 1000 -t 100000
