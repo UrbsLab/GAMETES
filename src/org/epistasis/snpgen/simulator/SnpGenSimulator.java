@@ -810,6 +810,7 @@ public class SnpGenSimulator {
 		int attributeCountNoiseGenerated;
 
 		final int instanceCount = (inNoiseDataset != null) ? inNoiseDataset.length : dd.totalCount.getInteger().intValue();
+		//System.out.println("Instance Count from noiseDataset is " + String.valueOf(instanceCount));
 
 		if (inNoiseDataset != null) {
 			// If there is a noise dataset then we don't generate any noise attributes:
