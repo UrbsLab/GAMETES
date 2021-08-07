@@ -82,13 +82,13 @@ GAMETES also allows users to generate models and datasets at the same time. In t
 user:~$ java -jar gametes_2.2_dev.jar -M " -h 0.2 -p 0.3 -a 0.3 -o modelForData" -q 1 -D "-n 0.01 -x 0.5 -a 100 -s 500 -w 500 -r 10 -o myData"
 ```
 
-**Creating a dataset based upon a loaded model**
+### **Creating a dataset based upon a loaded model**
 If the user has already created a model previously, it can be loaded to generate a dataset instead of having to be re-made. In this example, we load the model "myModel" from our GAMETES directory by calling "myModel_Models.txt", and then use it to create a new dataset directory called "dataLoadedFromModel" with a minimum MAF of 0.01, a maximum MAF of 0.5, 20 attributes, 50 cases, 50 controls, and 3 replicates.
 ```console
 user:~$ java -jar gametes_2.2_dev.jar -i "./modelForData_Models.txt" -D "-n 0.01 -x 0.5 -a 20 -s 50 -w 50 -r 3 -o dataLoadedFromModel"
 ```
 
-**Creating a dataset based upon a loaded model and real-world noise data**
+### **Creating a dataset based upon a loaded model and real-world noise data**
 In order to create "more realistic" epistatic data, the user can choose to embed epistatic signal into an input real-world dataset. This real-world data then serves as background noise in the epistatic dataset. In this example, we load the model "myModel" from our GAMETES directory by calling "myModel_Models.txt," and we also load an input dataset corresponding to SNP data for coronary artery disease (CAD). This CAD dataset includes 5000 SNPs and 2000 unlabeled instances. We then embed the epistatic signal from "myModel" into our CAD data, generating new output datasets including the 5000 non-predictive features, two new predictive features, and a "Class" column corresponding to 1000 case and 1000 control labels. These labels are determined solely based upon the epistatic signal, and are unrelated to the real-world input data.
 ```console
 user:~$ java -jar gametes_2.2_dev.jar -i "./modelForData_Models.txt" -D "-s 1000 -w 1000 -r 3 -o dataBasedOnRealWorldNoise" -z "./cad_gametes_input.txt"
