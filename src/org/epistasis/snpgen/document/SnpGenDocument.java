@@ -385,13 +385,10 @@ public class SnpGenDocument {
 				predictiveInputFile = new File(fileName);
 			}
 
-			System.out.println("NoiseInputFileOption is " + noiseInputFileOption);
 			fileName = parser.getOptionValue(noiseInputFileOption);
 			if (fileName == null) {
-				System.out.println("Noise Input file name is null");
 				noiseInputFile = null;
 			} else {
-				System.out.println("Noise Input File Name is " + fileName);
 				noiseInputFile = new File(fileName);
 			}
 
