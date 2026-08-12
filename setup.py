@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 
 setup(
-    name="gametes-python",
+    name="py-gametes",
     version="2.2.0",
     description="Python port of UrbsLab GAMETES v2.2",
     packages=find_packages(),

@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gametes-python"
+name = "py-gametes"
 version = "2.2.0"
 description = "Python port of UrbsLab GAMETES v2.2"
 readme = "README.md"
