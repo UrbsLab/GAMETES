@@ -49,6 +49,8 @@ TEXT = "#171717"
 MUTED = "#5f5f5f"
 INCOMPATIBLE = "#dedede"
 GRID = "#8a8a8a"
+HIGH_ORDER_WARNING_THRESHOLD = 8
+ATTRIBUTE_COUNT_SPINBOX_MAX = 2_147_483_647
 
 JAVA_MODEL_COLUMNS = (
     "Model",
@@ -76,6 +78,13 @@ def _fmt_property(value: Optional[float]) -> str:
     if math.isinf(value):
         return "∞"
     return f"{value:.4g}"
+
+
+def penetrance_cell_count(attribute_count: int) -> int:
+    """Return the number of genotype cells in an n-attribute SNP model."""
+    if attribute_count < 1:
+        raise ValueError("Attribute count must be positive")
+    return 3**attribute_count
 
 
 def normalized_model_weights(models: Sequence["ModelSpec"]) -> List[float]:
@@ -401,7 +410,14 @@ class GenerateModelDialog(_TkTopLevelBase):
         top = ttk.Frame(parameters)
         top.pack(fill="x", pady=(0, 5))
         ttk.Label(top, text="Number of attributes").pack(side="left")
-        ttk.Spinbox(top, from_=1, to=8, width=5, textvariable=self.attribute_count_var).pack(side="left", padx=(6, 30))
+        ttk.Spinbox(
+            top,
+            from_=1,
+            to=ATTRIBUTE_COUNT_SPINBOX_MAX,
+            increment=1,
+            width=5,
+            textvariable=self.attribute_count_var,
+        ).pack(side="left", padx=(6, 30))
         ttk.Label(top, text="Heritability").pack(side="left")
         ttk.Entry(top, textvariable=self.heritability_var, width=8).pack(side="left", padx=(6, 30))
         ttk.Checkbutton(
@@ -425,8 +441,39 @@ class GenerateModelDialog(_TkTopLevelBase):
 
         table_outer = tk.Frame(body, background=GRID, padx=1, pady=1)
         table_outer.pack(fill="both", expand=True)
-        self.attribute_table = tk.Frame(table_outer, background=FIELD)
-        self.attribute_table.pack(fill="both", expand=True)
+        self.attribute_canvas = tk.Canvas(
+            table_outer,
+            background=FIELD,
+            highlightthickness=0,
+            height=250,
+        )
+        self.attribute_v_scroll = ttk.Scrollbar(
+            table_outer,
+            orient="vertical",
+            command=self.attribute_canvas.yview,
+        )
+        self.attribute_h_scroll = ttk.Scrollbar(
+            table_outer,
+            orient="horizontal",
+            command=self.attribute_canvas.xview,
+        )
+        self.attribute_canvas.configure(
+            yscrollcommand=self.attribute_v_scroll.set,
+            xscrollcommand=self.attribute_h_scroll.set,
+        )
+        self.attribute_canvas.grid(row=0, column=0, sticky="nsew")
+        self.attribute_v_scroll.grid(row=0, column=1, sticky="ns")
+        self.attribute_h_scroll.grid(row=1, column=0, sticky="ew")
+        table_outer.columnconfigure(0, weight=1)
+        table_outer.rowconfigure(0, weight=1)
+        self.attribute_table = tk.Frame(self.attribute_canvas, background=FIELD)
+        self.attribute_table_window = self.attribute_canvas.create_window(
+            (0, 0),
+            window=self.attribute_table,
+            anchor="nw",
+        )
+        self.attribute_table.bind("<Configure>", self._attribute_table_configured)
+        self.attribute_canvas.bind("<Configure>", self._attribute_canvas_configured)
         self._sync_attribute_rows(2)
 
         buttons = ttk.Frame(body)
@@ -446,8 +493,16 @@ class GenerateModelDialog(_TkTopLevelBase):
             count = int(self.attribute_count_var.get())
         except ValueError:
             return
-        if 1 <= count <= 8:
+        if count >= 1:
             self._sync_attribute_rows(count)
+
+    def _attribute_table_configured(self, _event: object) -> None:
+        self.attribute_canvas.configure(scrollregion=self.attribute_canvas.bbox("all"))
+
+    def _attribute_canvas_configured(self, event: object) -> None:
+        minimum_width = 560
+        if event.width > minimum_width:
+            self.attribute_canvas.itemconfigure(self.attribute_table_window, width=event.width)
 
     def _sync_attribute_rows(self, count: int) -> None:
         if self._syncing_rows:
@@ -463,7 +518,14 @@ class GenerateModelDialog(_TkTopLevelBase):
 
             headers = (("SNP", 0), ("Minor allele frequency", 1))
             for text, column in headers:
-                tk.Label(self.attribute_table, text=text, background="#e3e3e3", relief="solid", borderwidth=1).grid(
+                tk.Label(
+                    self.attribute_table,
+                    text=text,
+                    background="#e3e3e3",
+                    foreground=TEXT,
+                    relief="solid",
+                    borderwidth=1,
+                ).grid(
                     row=0, column=column, sticky="nsew"
                 )
             self.attribute_table.columnconfigure(0, weight=1, minsize=280)
@@ -530,6 +592,18 @@ class GenerateModelDialog(_TkTopLevelBase):
         except Exception as exc:
             messagebox.showerror("Invalid model", str(exc), parent=self)
             return
+
+        if count >= HIGH_ORDER_WARNING_THRESHOLD:
+            cells = penetrance_cell_count(count)
+            proceed = messagebox.askyesno(
+                "High-order model",
+                f"A {count}-attribute model contains {cells:,} penetrance cells per table.\n\n"
+                "Generation time and memory use grow exponentially, especially with a large "
+                "quantile population. Continue?",
+                parent=self,
+            )
+            if not proceed:
+                return
 
         self.result = ModelSpec(
             name="Model",

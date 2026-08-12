@@ -25,6 +25,7 @@ from py_gametes.gui import (
     model_tables_path,
     normalize_model_output_prefix,
     normalized_model_weights,
+    penetrance_cell_count,
     save_model_spec,
     selected_model_can_be_edited,
     standardize_selected_quantiles,
@@ -77,6 +78,14 @@ def test_cli_main_no_args_launches_gui_like_the_jar(monkeypatch) -> None:
     code = main([])
     assert code == 0
     assert launched == [True]
+
+
+def test_penetrance_cell_count_has_no_eight_attribute_cap() -> None:
+    assert penetrance_cell_count(8) == 6_561
+    assert penetrance_cell_count(9) == 19_683
+    assert penetrance_cell_count(12) == 531_441
+    with pytest.raises(ValueError, match="positive"):
+        penetrance_cell_count(0)
 
 
 def test_java_random_matches_java_util_random_reference_sequence() -> None:
