@@ -1,0 +1,4 @@
+# GAMETES uses only the standard library at runtime.
+# Tkinter is supplied by the Python installation and is not a pip package.
+# The only external minimum dependency is for running tests.
+pytest>=7.0.0

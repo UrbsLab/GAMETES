@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gametes-python"
+version = "2.2.0"
+description = "Python port of UrbsLab GAMETES v2.2"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "UrbsLab (original GAMETES authors)" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Environment :: MacOS X",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+gametes = "py_gametes.cli:main"
+
+[tool.setuptools]
+packages = ["py_gametes"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

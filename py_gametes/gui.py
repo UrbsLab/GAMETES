@@ -1,21 +1,27 @@
 from __future__ import annotations
 
 import contextlib
+import copy
+import json
+import math
 import queue
 import shlex
+import sys
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, Dict, List, Optional, Sequence, Union
 
 from .cli import run_document
-from .document import SnpGenDocument
+from .document import DocDataset, DocModel, MixedModelDatasetType, SnpGenDocument
+from .penetrance_table import PenetranceTable
+from .simulator import SnpGenSimulator
 
 
 try:
     import tkinter as tk
     from tkinter import filedialog, messagebox, ttk
-except Exception:  # pragma: no cover - handled by caller
+except Exception:  # pragma: no cover - handled by launch_gui
     tk = None
     filedialog = None
     messagebox = None
@@ -25,27 +31,205 @@ except Exception:  # pragma: no cover - handled by caller
 if tk is not None:
     _TkRootBase = tk.Tk
     _TkTopLevelBase = tk.Toplevel
+    _TkFrameBase = ttk.Frame
 else:
-    class _TkRootBase:  # pragma: no cover - used only when Tkinter is absent
+    class _TkRootBase:  # pragma: no cover
         pass
 
-    class _TkTopLevelBase:  # pragma: no cover - used only when Tkinter is absent
+    class _TkTopLevelBase:  # pragma: no cover
+        pass
+
+    class _TkFrameBase:  # pragma: no cover
+        pass
+
+
+BACKGROUND = "#ececec"
+FIELD = "#ffffff"
+TEXT = "#171717"
+MUTED = "#5f5f5f"
+INCOMPATIBLE = "#dedede"
+GRID = "#8a8a8a"
+
+JAVA_MODEL_COLUMNS = (
+    "Model",
+    "# Attributes",
+    "Heritability",
+    "SNPs",
+    "Minor allele freq",
+    "Heterogeneity proportion",
+    "# Quantiles",
+    "Selected",
+)
+
+
+def _fmt(value: Optional[float], digits: int = 4) -> str:
+    if value is None or math.isnan(value):
+        return "--"
+    if math.isinf(value):
+        return "infinity"
+    return f"{value:.{digits}g}"
+
+
+def _fmt_property(value: Optional[float]) -> str:
+    if value is None or math.isnan(value):
+        return "-"
+    if math.isinf(value):
+        return "∞"
+    return f"{value:.4g}"
+
+
+def normalized_model_weights(models: Sequence["ModelSpec"]) -> List[float]:
+    selected_weights = [model.weight if model.selected else 0.0 for model in models]
+    total = sum(selected_weights)
+    if total <= 0.0:
+        return [0.0 for _ in models]
+    return [weight / total for weight in selected_weights]
+
+
+def common_selected_quantile_count(models: Sequence["ModelSpec"]) -> Optional[int]:
+    counts = {model.quantile_count for model in models if model.selected}
+    return next(iter(counts)) if len(counts) == 1 else None
+
+
+def model_can_be_selected(models: Sequence["ModelSpec"], index: int) -> bool:
+    model = models[index]
+    if model.selected:
+        return True
+    selected_counts = {other.quantile_count for other in models if other.selected}
+    return not selected_counts or selected_counts == {model.quantile_count}
+
+
+def selected_model_can_be_edited(models: Sequence["ModelSpec"]) -> bool:
+    selected = [model for model in models if model.selected]
+    if len(selected) != 1:
+        return False
+    model = selected[0]
+    return bool(model.tables) and model.order in (2, 3) and model.quantile_count == 1
+
+
+def standardize_selected_quantiles(models: Sequence["ModelSpec"]) -> Optional[int]:
+    """Keep the first selected quantile group and deselect incompatible models."""
+    target: Optional[int] = None
+    for model in models:
+        if not model.selected:
+            continue
+        if target is None:
+            target = model.quantile_count
+        elif model.quantile_count != target:
+            model.selected = False
+    return target
+
+
+def normalize_model_output_prefix(path: Union[str, Path]) -> Path:
+    output = Path(path)
+    name = output.name
+    if name.lower().endswith(".txt"):
+        name = name[:-4]
+    if name.lower().endswith("_models"):
+        name = name[:-7]
+    if not name:
+        raise ValueError("Model output prefix is required")
+    return output.with_name(name)
+
+
+def model_tables_path(path: Union[str, Path]) -> Path:
+    prefix = normalize_model_output_prefix(path)
+    return prefix.with_name(f"{prefix.name}_Models.txt")
+
+
+def clean_model_name(path: Union[str, Path]) -> str:
+    return normalize_model_output_prefix(path).name
+
+
+def build_custom_table(
+    order: int,
+    mafs: Sequence[float],
+    values: Sequence[float],
+    attribute_names: Optional[Sequence[str]] = None,
+) -> PenetranceTable:
+    if order not in (2, 3):
+        raise ValueError("Custom models must be 2-locus or 3-locus")
+    if len(mafs) != order:
+        raise ValueError(f"A {order}-locus model requires {order} minor allele frequencies")
+    if any(maf < 0.0 or maf > 0.5 for maf in mafs):
+        raise ValueError("Minor allele frequencies must be between 0 and 0.5")
+    if len(values) != 3**order:
+        raise ValueError(f"A {order}-locus model requires {3**order} penetrance values")
+    if any(not math.isfinite(value) or value < 0.0 or value > 1.0 for value in values):
+        raise ValueError("Penetrance values must be between 0 and 1")
+
+    names = list(attribute_names) if attribute_names is not None else [f"P{i + 1}" for i in range(order)]
+    if len(names) != order or any(not name.strip() for name in names) or len(set(names)) != order:
+        raise ValueError("Feature names must be non-empty and unique")
+
+    table = PenetranceTable(3, order)
+    table.set_attribute_names(names)
+    table.set_minor_allele_frequencies(list(mafs))
+    for cell, value in zip(table.cells, values):
+        cell.value = float(value)
+        cell.is_set = True
+
+    # Java's direct editor saves user-entered tables as unnormalized models.
+    table.normalized = False
+    table.calc_and_set_prevalence()
+    table.calc_and_set_heritability()
+    table.calc_and_set_edm()
+    table.calc_and_set_odds_ratio()
+    table.check_row_sums()
+    return table
+
+
+def _activate_window(window: object) -> None:
+    try:
+        window.update_idletasks()
+        window.lift()
+        window.focus_force()
+    except Exception:
         pass
 
 
 @dataclass
 class ModelSpec:
-    heritability: float
-    case_proportion: Optional[float]
+    name: str
+    source: str
+    heritability: Optional[float]
+    prevalence: Optional[float]
     mafs: List[float]
-    output_prefix: str
+    feature_names: List[str] = field(default_factory=list)
+    output_prefix: str = ""
     use_odds_ratio: bool = False
     weight: float = 1.0
+    selected: bool = False
+    tables: List[PenetranceTable] = field(default_factory=list)
+    population_scores: List[float] = field(default_factory=list)
+    input_path: str = ""
+    requested_quantiles: int = 1
+    population_count: int = 1000
+    try_count: int = 100000
+
+    def __post_init__(self) -> None:
+        if not self.feature_names:
+            if self.tables:
+                self.feature_names = self.tables[0].get_attribute_names()
+            else:
+                self.feature_names = [f"P{i + 1}" for i in range(len(self.mafs))]
+
+    @property
+    def order(self) -> int:
+        return len(self.mafs)
+
+    @property
+    def quantile_count(self) -> int:
+        return len(self.tables) if self.tables else self.requested_quantiles
+
+    @property
+    def attribute_names(self) -> List[str]:
+        return list(self.feature_names)
 
     def to_blob(self) -> str:
         tokens = ["-h", str(self.heritability)]
-        if self.case_proportion is not None:
-            tokens += ["-p", str(self.case_proportion)]
+        if self.prevalence is not None:
+            tokens += ["-p", str(self.prevalence)]
         if self.use_odds_ratio:
             tokens.append("-d")
         for maf in self.mafs:
@@ -53,605 +237,1570 @@ class ModelSpec:
         tokens += ["-o", self.output_prefix]
         return shlex.join(tokens)
 
+    def to_doc_model(self) -> DocModel:
+        model = DocModel(attribute_count=self.order, model_id=self.name)
+        model.attribute_name_array = self.attribute_names
+        model.attribute_allele_frequency_array = list(self.mafs)
+        model.heritability = self.heritability
+        model.prevalence = self.prevalence
+        model.fraction = self.weight
+        model.use_odds_ratio = self.use_odds_ratio
+        model.file = None if self.source == "loaded" else Path(self.output_prefix)
+        if self.tables:
+            model.set_penetrance_tables(copy.deepcopy(self.tables))
+        return model
 
-@dataclass
-class InputModelSpec:
-    path: str
-    weight: float = 1.0
+
+def load_model_spec(path: Union[str, Path]) -> ModelSpec:
+    input_path = Path(path)
+    tables = SnpGenSimulator().fetch_tables(input_path)
+    if not tables:
+        raise ValueError("The model file contains no penetrance tables")
+    first = tables[0]
+    return ModelSpec(
+        name=clean_model_name(input_path),
+        source="loaded",
+        heritability=first.actual_heritability,
+        prevalence=first.prevalence,
+        mafs=first.get_minor_allele_frequencies(),
+        feature_names=first.get_attribute_names(),
+        output_prefix=str(normalize_model_output_prefix(input_path)),
+        input_path=str(input_path),
+        tables=tables,
+        requested_quantiles=len(tables),
+    )
 
 
-class _QueueWriter:
-    def __init__(self, q: "queue.Queue[str]") -> None:
-        self._q = q
+def save_model_spec(model: ModelSpec, output_prefix: Optional[Union[str, Path]] = None) -> Path:
+    if not model.tables:
+        raise ValueError("Generate the model before saving it")
+    prefix = normalize_model_output_prefix(output_prefix or model.output_prefix)
+    doc_model = model.to_doc_model()
+    doc_model.file = prefix
+    simulator = SnpGenSimulator()
+    if model.population_scores:
+        simulator.write_tables_and_scores_to_file(
+            [doc_model],
+            [list(model.population_scores)],
+            model.quantile_count,
+        )
+    else:
+        simulator.write_model_tables(
+            doc_model,
+            model_tables_path(prefix),
+            header=None,
+            save_unnormalized=True,
+        )
+    model.output_prefix = str(prefix)
+    model.input_path = str(model_tables_path(prefix))
+    return model_tables_path(prefix)
 
-    def write(self, s: str) -> int:
-        if s:
-            self._q.put(s)
-        return len(s)
+
+def generate_and_save_model_spec(model: ModelSpec, random_seed: Optional[int] = None) -> ModelSpec:
+    if model.source != "generated":
+        raise ValueError("Only generated model specifications can be materialized")
+    generated = copy.deepcopy(model)
+    generated.output_prefix = str(normalize_model_output_prefix(generated.output_prefix))
+    document = SnpGenDocument(
+        ras_quantile_count=generated.requested_quantiles,
+        ras_population_count=generated.population_count,
+        ras_try_count=generated.try_count,
+        random_seed=random_seed,
+    )
+    doc_model = generated.to_doc_model()
+    document.model_list = [doc_model]
+    simulator = SnpGenSimulator()
+    simulator.set_document(document)
+    scores = simulator.generate_tables_for_one_model(
+        model=doc_model,
+        desired_quantile_count=generated.requested_quantiles,
+        desired_population_count=generated.population_count,
+        try_count=generated.try_count,
+    )
+    generated.tables = copy.deepcopy(doc_model.penetrance_tables)
+    generated.population_scores = list(scores)
+    generated.heritability = doc_model.heritability
+    generated.prevalence = doc_model.prevalence
+    save_model_spec(generated)
+    return generated
+
+
+class _WorkerQueueWriter:
+    def __init__(self, output_queue: object) -> None:
+        self._queue = output_queue
+
+    def write(self, text: str) -> int:
+        if text:
+            self._queue.put(("log", text))
+        return len(text)
 
     def flush(self) -> None:
         return
 
 
-class ModelDialog(_TkTopLevelBase):
-    def __init__(self, parent: tk.Tk, model: Optional[ModelSpec] = None) -> None:
+def _model_generation_worker(output_queue: object, specification: ModelSpec, random_seed: Optional[int]) -> None:
+    writer = _WorkerQueueWriter(output_queue)
+    try:
+        with contextlib.redirect_stdout(writer), contextlib.redirect_stderr(writer):
+            result = generate_and_save_model_spec(specification, random_seed)
+        output_queue.put(("model", result))
+    except Exception as exc:
+        output_queue.put(("error", str(exc)))
+    finally:
+        output_queue.put(("done", None))
+
+
+def _dataset_generation_worker(output_queue: object, document: SnpGenDocument) -> None:
+    writer = _WorkerQueueWriter(output_queue)
+    try:
+        with contextlib.redirect_stdout(writer), contextlib.redirect_stderr(writer):
+            simulator = SnpGenSimulator()
+            simulator.set_document(document)
+            simulator.combine_model_tables_into_quantiles(document.model_list, document.model_input_files)
+            simulator.generate_datasets()
+    except Exception as exc:
+        output_queue.put(("error", str(exc)))
+    finally:
+        output_queue.put(("done", None))
+
+
+def _responsive_worker_entry(target: object, output_queue: object, *arguments: object) -> None:
+    prior_interval = sys.getswitchinterval()
+    sys.setswitchinterval(0.001)
+    try:
+        target(output_queue, *arguments)
+    finally:
+        sys.setswitchinterval(prior_interval)
+
+
+class GenerateModelDialog(_TkTopLevelBase):
+    def __init__(self, parent: object, first_attribute_number: int = 1) -> None:
         super().__init__(parent)
-        self.title("Model")
-        self.resizable(False, False)
+        self.title("Generate Model")
+        self.configure(background=BACKGROUND)
         self.transient(parent)
-        self.grab_set()
-
         self.result: Optional[ModelSpec] = None
+        self.first_attribute_number = first_attribute_number
+        self._syncing_rows = False
 
-        initial = model or ModelSpec(
-            heritability=0.2,
-            case_proportion=0.5,
-            mafs=[0.3, 0.2],
-            output_prefix="model",
-            use_odds_ratio=False,
-            weight=1.0,
-        )
+        self.attribute_count_var = tk.StringVar(value="2")
+        self.heritability_var = tk.StringVar(value="0.2")
+        self.prevalence_enabled_var = tk.BooleanVar(value=False)
+        self.prevalence_var = tk.StringVar(value="")
+        self.metric_var = tk.StringVar(value="edm")
+        self.quantile_count_var = tk.StringVar(value="2")
+        self.population_count_var = tk.StringVar(value="1000")
+        self.name_vars: List[tk.StringVar] = []
+        self.maf_vars: List[tk.StringVar] = []
 
-        frm = ttk.Frame(self, padding=12)
-        frm.grid(row=0, column=0, sticky="nsew")
+        body = ttk.Frame(self, padding=7)
+        body.pack(fill="both", expand=True)
+        parameters = ttk.Frame(body)
+        parameters.pack(fill="x")
 
-        self.herit_var = tk.StringVar(value=str(initial.heritability))
-        self.case_prop_var = tk.StringVar(value="" if initial.case_proportion is None else str(initial.case_proportion))
-        self.maf_var = tk.StringVar(value=",".join(str(x) for x in initial.mafs))
-        self.output_var = tk.StringVar(value=initial.output_prefix)
-        self.weight_var = tk.StringVar(value=str(initial.weight))
-        self.odds_var = tk.BooleanVar(value=initial.use_odds_ratio)
+        top = ttk.Frame(parameters)
+        top.pack(fill="x", pady=(0, 5))
+        ttk.Label(top, text="Number of attributes").pack(side="left")
+        ttk.Spinbox(top, from_=1, to=8, width=5, textvariable=self.attribute_count_var).pack(side="left", padx=(6, 30))
+        ttk.Label(top, text="Heritability").pack(side="left")
+        ttk.Entry(top, textvariable=self.heritability_var, width=8).pack(side="left", padx=(6, 30))
+        ttk.Checkbutton(
+            top,
+            variable=self.prevalence_enabled_var,
+            command=self._toggle_prevalence,
+        ).pack(side="left")
+        ttk.Label(top, text="Prevalence").pack(side="left", padx=(4, 6))
+        self.prevalence_entry = ttk.Entry(top, textvariable=self.prevalence_var, width=8)
+        self.prevalence_entry.pack(side="left")
 
-        ttk.Label(frm, text="Heritability").grid(row=0, column=0, sticky="w")
-        ttk.Entry(frm, textvariable=self.herit_var, width=28).grid(row=0, column=1, sticky="ew")
+        quantiles = ttk.Frame(parameters)
+        quantiles.pack(fill="x", pady=(0, 5))
+        ttk.Label(quantiles, text="Quantiles:").pack(side="left")
+        ttk.Radiobutton(quantiles, text="EDM", value="edm", variable=self.metric_var).pack(side="left", padx=(6, 4))
+        ttk.Radiobutton(quantiles, text="Odds ratio", value="odds", variable=self.metric_var).pack(side="left", padx=(0, 16))
+        ttk.Label(quantiles, text="Quantile count").pack(side="left")
+        ttk.Entry(quantiles, textvariable=self.quantile_count_var, width=10).pack(side="left", padx=(6, 20))
+        ttk.Label(quantiles, text="Quantile population size").pack(side="left")
+        ttk.Entry(quantiles, textvariable=self.population_count_var, width=10).pack(side="left", padx=(6, 0))
 
-        ttk.Label(frm, text="Case Proportion (optional)").grid(row=1, column=0, sticky="w")
-        ttk.Entry(frm, textvariable=self.case_prop_var, width=28).grid(row=1, column=1, sticky="ew")
+        table_outer = tk.Frame(body, background=GRID, padx=1, pady=1)
+        table_outer.pack(fill="both", expand=True)
+        self.attribute_table = tk.Frame(table_outer, background=FIELD)
+        self.attribute_table.pack(fill="both", expand=True)
+        self._sync_attribute_rows(2)
 
-        ttk.Label(frm, text="MAFs (comma-separated)").grid(row=2, column=0, sticky="w")
-        ttk.Entry(frm, textvariable=self.maf_var, width=28).grid(row=2, column=1, sticky="ew")
+        buttons = ttk.Frame(body)
+        buttons.pack(pady=(8, 0))
+        ttk.Button(buttons, text="Save", command=self._save).pack(side="left", padx=(0, 5))
+        ttk.Button(buttons, text="Cancel", command=self._cancel).pack(side="left")
 
-        ttk.Label(frm, text="Output Prefix").grid(row=3, column=0, sticky="w")
-        output_entry = ttk.Entry(frm, textvariable=self.output_var, width=28)
-        output_entry.grid(row=3, column=1, sticky="ew")
+        self.attribute_count_var.trace_add("write", self._attribute_count_changed)
+        self._toggle_prevalence()
+        self.bind("<Escape>", lambda _event: self._cancel())
+        self.protocol("WM_DELETE_WINDOW", self._cancel)
+        self.grab_set()
+        self.after_idle(lambda: _activate_window(self))
 
-        def browse_output() -> None:
-            assert filedialog is not None
-            p = filedialog.asksaveasfilename(title="Model output prefix")
-            if p:
-                self.output_var.set(p)
+    def _attribute_count_changed(self, *_args: object) -> None:
+        try:
+            count = int(self.attribute_count_var.get())
+        except ValueError:
+            return
+        if 1 <= count <= 8:
+            self._sync_attribute_rows(count)
 
-        ttk.Button(frm, text="Browse", command=browse_output).grid(row=3, column=2, padx=(6, 0))
+    def _sync_attribute_rows(self, count: int) -> None:
+        if self._syncing_rows:
+            return
+        self._syncing_rows = True
+        try:
+            old_names = [variable.get() for variable in self.name_vars]
+            old_mafs = [variable.get() for variable in self.maf_vars]
+            for child in self.attribute_table.winfo_children():
+                child.destroy()
+            self.name_vars = []
+            self.maf_vars = []
 
-        ttk.Label(frm, text="Weight").grid(row=4, column=0, sticky="w")
-        ttk.Entry(frm, textvariable=self.weight_var, width=28).grid(row=4, column=1, sticky="ew")
+            headers = (("SNP", 0), ("Minor allele frequency", 1))
+            for text, column in headers:
+                tk.Label(self.attribute_table, text=text, background="#e3e3e3", relief="solid", borderwidth=1).grid(
+                    row=0, column=column, sticky="nsew"
+                )
+            self.attribute_table.columnconfigure(0, weight=1, minsize=280)
+            self.attribute_table.columnconfigure(1, weight=1, minsize=280)
+            for index in range(count):
+                name = old_names[index] if index < len(old_names) else f"P{self.first_attribute_number + index}"
+                maf = old_mafs[index] if index < len(old_mafs) else "0.2"
+                name_var = tk.StringVar(value=name)
+                maf_var = tk.StringVar(value=maf)
+                self.name_vars.append(name_var)
+                self.maf_vars.append(maf_var)
+                tk.Entry(
+                    self.attribute_table,
+                    textvariable=name_var,
+                    relief="solid",
+                    borderwidth=1,
+                    background=FIELD,
+                    foreground=TEXT,
+                    insertbackground=TEXT,
+                ).grid(
+                    row=index + 1, column=0, sticky="nsew"
+                )
+                tk.Entry(
+                    self.attribute_table,
+                    textvariable=maf_var,
+                    relief="solid",
+                    borderwidth=1,
+                    background=FIELD,
+                    foreground=TEXT,
+                    insertbackground=TEXT,
+                ).grid(
+                    row=index + 1, column=1, sticky="nsew"
+                )
+        finally:
+            self._syncing_rows = False
 
-        ttk.Checkbutton(frm, text="Use Odds Ratio", variable=self.odds_var).grid(row=5, column=0, columnspan=2, sticky="w")
-
-        btns = ttk.Frame(frm)
-        btns.grid(row=6, column=0, columnspan=3, pady=(10, 0), sticky="e")
-        ttk.Button(btns, text="Cancel", command=self._cancel).grid(row=0, column=0, padx=(0, 6))
-        ttk.Button(btns, text="Save", command=self._save).grid(row=0, column=1)
-
-        frm.columnconfigure(1, weight=1)
-        self.bind("<Escape>", lambda _e: self._cancel())
-        self.bind("<Return>", lambda _e: self._save())
-
-    def _cancel(self) -> None:
-        self.result = None
-        self.destroy()
+    def _toggle_prevalence(self) -> None:
+        self.prevalence_entry.state(["!disabled"] if self.prevalence_enabled_var.get() else ["disabled"])
 
     def _save(self) -> None:
         assert messagebox is not None
         try:
-            heritability = float(self.herit_var.get().strip())
-            case_raw = self.case_prop_var.get().strip()
-            case_prop = None if case_raw == "" else float(case_raw)
-            mafs = [float(x.strip()) for x in self.maf_var.get().split(",") if x.strip()]
-            if not mafs:
-                raise ValueError("At least one MAF is required")
-            output_prefix = self.output_var.get().strip()
-            if not output_prefix:
-                raise ValueError("Output prefix is required")
-            weight = float(self.weight_var.get().strip())
-            if weight == 0:
-                raise ValueError("Weight must be non-zero")
+            count = int(self.attribute_count_var.get())
+            if count != len(self.name_vars):
+                raise ValueError("Number of attributes is invalid")
+            heritability = float(self.heritability_var.get())
+            if not 0.0 < heritability <= 1.0:
+                raise ValueError("Heritability must be greater than 0 and at most 1")
+            prevalence = None
+            if self.prevalence_enabled_var.get():
+                prevalence = float(self.prevalence_var.get())
+                if not 0.0 < prevalence < 1.0:
+                    raise ValueError("Prevalence must be between 0 and 1")
+            names = [variable.get().strip() for variable in self.name_vars]
+            if any(not name for name in names) or len(set(names)) != len(names):
+                raise ValueError("SNP names must be non-empty and unique")
+            mafs = [float(variable.get()) for variable in self.maf_vars]
+            if any(not 0.0 < maf <= 0.5 for maf in mafs):
+                raise ValueError("Minor allele frequencies must be greater than 0 and at most 0.5")
+            quantiles = int(self.quantile_count_var.get())
+            population = int(self.population_count_var.get())
+            if quantiles <= 0 or population < quantiles:
+                raise ValueError("Quantile count must be positive and no larger than the population size")
         except Exception as exc:
             messagebox.showerror("Invalid model", str(exc), parent=self)
             return
 
         self.result = ModelSpec(
+            name="Model",
+            source="generated",
             heritability=heritability,
-            case_proportion=case_prop,
+            prevalence=prevalence,
             mafs=mafs,
-            output_prefix=output_prefix,
-            use_odds_ratio=bool(self.odds_var.get()),
-            weight=weight,
+            feature_names=names,
+            use_odds_ratio=self.metric_var.get() == "odds",
+            requested_quantiles=quantiles,
+            population_count=population,
+            try_count=min(max(population * 100, 100000), 2_147_483_647),
         )
         self.destroy()
-
-
-class InputModelDialog(_TkTopLevelBase):
-    def __init__(self, parent: tk.Tk, model: Optional[InputModelSpec] = None) -> None:
-        super().__init__(parent)
-        self.title("Loaded Model File")
-        self.resizable(False, False)
-        self.transient(parent)
-        self.grab_set()
-
-        self.result: Optional[InputModelSpec] = None
-
-        initial = model or InputModelSpec(path="", weight=1.0)
-
-        frm = ttk.Frame(self, padding=12)
-        frm.grid(row=0, column=0, sticky="nsew")
-
-        self.path_var = tk.StringVar(value=initial.path)
-        self.weight_var = tk.StringVar(value=str(initial.weight))
-
-        ttk.Label(frm, text="Model File").grid(row=0, column=0, sticky="w")
-        ttk.Entry(frm, textvariable=self.path_var, width=42).grid(row=0, column=1, sticky="ew")
-
-        def browse() -> None:
-            assert filedialog is not None
-            p = filedialog.askopenfilename(title="Select model file", filetypes=[("Text", "*.txt"), ("All", "*")])
-            if p:
-                self.path_var.set(p)
-
-        ttk.Button(frm, text="Browse", command=browse).grid(row=0, column=2, padx=(6, 0))
-
-        ttk.Label(frm, text="Weight").grid(row=1, column=0, sticky="w")
-        ttk.Entry(frm, textvariable=self.weight_var, width=16).grid(row=1, column=1, sticky="w")
-
-        btns = ttk.Frame(frm)
-        btns.grid(row=2, column=0, columnspan=3, pady=(10, 0), sticky="e")
-        ttk.Button(btns, text="Cancel", command=self._cancel).grid(row=0, column=0, padx=(0, 6))
-        ttk.Button(btns, text="Save", command=self._save).grid(row=0, column=1)
-
-        frm.columnconfigure(1, weight=1)
-        self.bind("<Escape>", lambda _e: self._cancel())
-        self.bind("<Return>", lambda _e: self._save())
 
     def _cancel(self) -> None:
         self.result = None
         self.destroy()
 
+
+class CustomModelDialog(_TkTopLevelBase):
+    GENOTYPES = (("AA", "Aa", "aa"), ("BB", "Bb", "bb"), ("CC", "Cc", "cc"))
+
+    def __init__(self, parent: object, model: ModelSpec, creating: bool = False) -> None:
+        super().__init__(parent)
+        self.title("Create Model" if creating else "Edit Model")
+        self.configure(background=BACKGROUND)
+        self.transient(parent)
+        self.result: Optional[ModelSpec] = None
+        self.original = copy.deepcopy(model)
+        self.order_var = tk.IntVar(value=model.order)
+        self.feature_names = list(model.attribute_names)
+        while len(self.feature_names) < 3:
+            self.feature_names.append(f"P{len(self.feature_names) + 1}")
+        self.maf_vars = [tk.StringVar(value=str(value)) for value in model.mafs]
+        while len(self.maf_vars) < 3:
+            self.maf_vars.append(tk.StringVar(value="0.2"))
+        initial_values = [cell.value for cell in model.tables[0].cells] if model.tables else [0.0] * (3**model.order)
+        self._preserved_values = list(initial_values)
+        self.cell_vars: List[tk.StringVar] = []
+        self.property_vars: Dict[str, tk.StringVar] = {
+            "heritability": tk.StringVar(value="-"),
+            "prevalence": tk.StringVar(value="-"),
+            "edm": tk.StringVar(value="-"),
+            "odds": tk.StringVar(value="-"),
+        }
+        self.marginal_var = tk.StringVar(value="")
+
+        body = ttk.Frame(self, padding=7)
+        body.pack(fill="both", expand=True)
+        header = ttk.Frame(body)
+        header.pack()
+        ttk.Label(header, text="Model Order:").pack(side="left")
+        ttk.Radiobutton(header, text="2-locus", value=2, variable=self.order_var, command=self._change_order).pack(side="left", padx=(5, 0))
+        ttk.Radiobutton(header, text="3-locus", value=3, variable=self.order_var, command=self._change_order).pack(side="left", padx=(5, 0))
+
+        content = ttk.Frame(body)
+        content.pack(fill="both", expand=True, pady=(7, 0))
+        self.table_host = ttk.Frame(content)
+        self.table_host.grid(row=0, column=0, sticky="nsew", padx=(0, 15))
+        side = ttk.Frame(content)
+        side.grid(row=0, column=1, sticky="nsew")
+        self.maf_host = ttk.Frame(side, padding=10, relief="solid")
+        self.maf_host.pack(fill="x")
+        ttk.Label(self.maf_host, text="Minor-Allele Frequencies:", font=("TkDefaultFont", 10, "bold")).grid(
+            row=0, column=0, columnspan=2, pady=(0, 7)
+        )
+        self.maf_rows = ttk.Frame(self.maf_host)
+        self.maf_rows.grid(row=1, column=0, columnspan=2)
+
+        properties = ttk.Frame(side, padding=10, relief="solid")
+        properties.pack(fill="x", pady=(15, 0))
+        for row, (key, label) in enumerate(
+            (("heritability", "Heritability:"), ("prevalence", "Prevalence:"), ("edm", "EDM:"), ("odds", "COR:"))
+        ):
+            ttk.Label(properties, text=label).grid(row=row, column=0, sticky="e", pady=3)
+            ttk.Label(properties, textvariable=self.property_vars[key], font=("TkDefaultFont", 10, "bold")).grid(
+                row=row, column=1, sticky="w", padx=(5, 0), pady=3
+            )
+
+        marginals = ttk.Frame(side, padding=10, relief="solid")
+        marginals.pack(fill="both", expand=True, pady=(15, 0))
+        ttk.Label(marginals, text="Marginal Penetrances:", font=("TkDefaultFont", 10, "bold")).pack(pady=(0, 7))
+        ttk.Label(marginals, textvariable=self.marginal_var, justify="left").pack(anchor="w")
+
+        buttons = ttk.Frame(body)
+        buttons.pack(pady=(8, 0))
+        ttk.Button(buttons, text="Save", command=self._save).pack(side="left")
+        ttk.Button(buttons, text="Clear", command=self._clear).pack(side="left", padx=5)
+        ttk.Button(buttons, text="Cancel", command=self._cancel).pack(side="left")
+
+        content.columnconfigure(0, weight=3)
+        content.columnconfigure(1, weight=2)
+        content.rowconfigure(0, weight=1)
+        self._build_editor(initial_values)
+        self.bind("<Escape>", lambda _event: self._cancel())
+        self.protocol("WM_DELETE_WINDOW", self._cancel)
+        self.grab_set()
+        self.after_idle(lambda: _activate_window(self))
+
+    def _change_order(self) -> None:
+        self._preserved_values = self._current_values(fallback=True)
+        self._build_editor(self._preserved_values)
+
+    def _build_editor(self, values: Sequence[float]) -> None:
+        for child in self.table_host.winfo_children():
+            child.destroy()
+        for child in self.maf_rows.winfo_children():
+            child.destroy()
+
+        order = self.order_var.get()
+        self.cell_vars = []
+        panels = 3 if order == 3 else 1
+        for panel_index in range(panels):
+            panel = ttk.Frame(self.table_host)
+            panel.grid(row=panel_index, column=0, sticky="w", pady=(0, 14 if panel_index < panels - 1 else 0))
+            if order == 3:
+                ttk.Label(panel, text=f"{self.feature_names[2]}  {self.GENOTYPES[2][panel_index]}", font=("TkDefaultFont", 10, "bold")).grid(
+                    row=0, column=0, rowspan=2, padx=(0, 8)
+                )
+            ttk.Label(panel, text=self.feature_names[0], font=("TkDefaultFont", 10, "bold")).grid(row=0, column=2, columnspan=3)
+            for column, genotype in enumerate(self.GENOTYPES[0]):
+                ttk.Label(panel, text=genotype).grid(row=1, column=column + 2, padx=4)
+            ttk.Label(panel, text=self.feature_names[1], font=("TkDefaultFont", 10, "bold")).grid(row=2, column=0, rowspan=3, padx=(0, 6))
+            for row, genotype in enumerate(self.GENOTYPES[1]):
+                ttk.Label(panel, text=genotype).grid(row=row + 2, column=1, sticky="e", padx=(0, 4))
+                for column in range(3):
+                    index = column + (3 * row) + (9 * panel_index)
+                    value = values[index] if index < len(values) else 0.0
+                    variable = tk.StringVar(value=f"{float(value):.7g}")
+                    self.cell_vars.append(variable)
+                    entry = ttk.Entry(panel, textvariable=variable, width=7)
+                    entry.grid(row=row + 2, column=column + 2, padx=2, pady=2)
+                    entry.bind("<FocusOut>", self._refresh_stats)
+                    entry.bind("<Return>", self._refresh_stats)
+
+        for index in range(order):
+            ttk.Label(self.maf_rows, text=f"MAF {self.feature_names[index]}:").grid(row=index, column=0, sticky="e", pady=3)
+            entry = ttk.Entry(self.maf_rows, textvariable=self.maf_vars[index], width=8)
+            entry.grid(row=index, column=1, sticky="w", padx=(7, 0), pady=3)
+            entry.bind("<FocusOut>", self._refresh_stats)
+            entry.bind("<Return>", self._refresh_stats)
+        self._refresh_stats()
+
+    def _current_values(self, fallback: bool = False) -> List[float]:
+        values: List[float] = []
+        for variable in self.cell_vars:
+            try:
+                values.append(float(variable.get()))
+            except ValueError:
+                values.append(0.0 if fallback else float("nan"))
+        return values
+
+    def _table_from_ui(self) -> PenetranceTable:
+        order = self.order_var.get()
+        mafs = [float(self.maf_vars[index].get()) for index in range(order)]
+        return build_custom_table(order, mafs, self._current_values(), self.feature_names[:order])
+
+    def _refresh_stats(self, _event: object = None) -> None:
+        try:
+            table = self._table_from_ui()
+        except Exception:
+            for variable in self.property_vars.values():
+                variable.set("-")
+            self.marginal_var.set("")
+            return
+        self.property_vars["heritability"].set(_fmt_property(table.actual_heritability))
+        self.property_vars["prevalence"].set(_fmt_property(table.prevalence))
+        self.property_vars["edm"].set(_fmt_property(table.edm))
+        self.property_vars["odds"].set(_fmt_property(table.odds_ratio))
+        lines = []
+        for index, values in enumerate(table.calc_marginal_prevalences()):
+            rendered = "   ".join(f"{name} {_fmt_property(value)}" for name, value in zip(self.GENOTYPES[index], values))
+            lines.append(f"{self.feature_names[index]}  {rendered}")
+        self.marginal_var.set("\n\n".join(lines))
+
+    def _clear(self) -> None:
+        for variable in self.cell_vars:
+            variable.set("0")
+        for index in range(self.order_var.get()):
+            self.maf_vars[index].set("0")
+        self._refresh_stats()
+
     def _save(self) -> None:
         assert messagebox is not None
         try:
-            path = self.path_var.get().strip()
-            if not path:
-                raise ValueError("Model file path is required")
-            weight = float(self.weight_var.get().strip())
-            if weight == 0:
-                raise ValueError("Weight must be non-zero")
+            table = self._table_from_ui()
         except Exception as exc:
-            messagebox.showerror("Invalid model file", str(exc), parent=self)
+            messagebox.showerror("Invalid model", str(exc), parent=self)
             return
-
-        self.result = InputModelSpec(path=path, weight=weight)
+        order = self.order_var.get()
+        self.result = ModelSpec(
+            name=self.original.name,
+            source="custom",
+            heritability=table.actual_heritability,
+            prevalence=table.prevalence,
+            mafs=[float(self.maf_vars[index].get()) for index in range(order)],
+            feature_names=self.feature_names[:order],
+            output_prefix=self.original.output_prefix,
+            weight=self.original.weight,
+            selected=self.original.selected,
+            tables=[table],
+            requested_quantiles=1,
+            population_count=1,
+            try_count=1,
+        )
         self.destroy()
+
+    def _cancel(self) -> None:
+        self.result = None
+        self.destroy()
+
+
+class ModelTableView(_TkFrameBase):
+    WIDTHS = (125, 82, 88, 120, 130, 145, 88, 78)
+
+    def __init__(
+        self,
+        parent: object,
+        on_selection: Callable[[int, bool], None],
+        on_weight: Callable[[int, float], None],
+    ) -> None:
+        super().__init__(parent)
+        self.on_selection = on_selection
+        self.on_weight = on_weight
+        self.models: Sequence[ModelSpec] = []
+        self.running = False
+        self.row_widgets: List[List[object]] = []
+        self.selected_vars: List[object] = []
+        self.checkboxes: List[object] = []
+        self.weight_entries: List[object] = []
+        self.row_compatible: List[bool] = []
+        self.row_running: List[bool] = []
+        self.canvas = tk.Canvas(self, background=FIELD, highlightthickness=1, highlightbackground=GRID, height=260)
+        self.v_scroll = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.h_scroll = ttk.Scrollbar(self, orient="horizontal", command=self.canvas.xview)
+        self.canvas.configure(yscrollcommand=self.v_scroll.set, xscrollcommand=self.h_scroll.set)
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+        self.v_scroll.grid(row=0, column=1, sticky="ns")
+        self.h_scroll.grid(row=1, column=0, sticky="ew")
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+        self.body = tk.Frame(self.canvas, background=FIELD)
+        self.body_window = self.canvas.create_window((0, 0), window=self.body, anchor="nw")
+        self.body.bind("<Configure>", self._body_configured)
+        self.canvas.bind("<Configure>", self._canvas_configured)
+
+    def _body_configured(self, _event: object) -> None:
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _canvas_configured(self, event: object) -> None:
+        required = sum(self.WIDTHS)
+        if event.width > required:
+            self.canvas.itemconfigure(self.body_window, width=event.width)
+
+    def _cell(self, row: int, column: int, height: int, background: str) -> tk.Frame:
+        cell = tk.Frame(
+            self.body,
+            width=self.WIDTHS[column],
+            height=height,
+            background=background,
+            highlightbackground=GRID,
+            highlightthickness=1,
+        )
+        cell.grid(row=row, column=column, sticky="nsew")
+        cell.grid_propagate(False)
+        return cell
+
+    def rebuild(self, models: Sequence[ModelSpec], running: bool = False) -> None:
+        self.models = models
+        self.running = running
+        self.row_widgets = []
+        self.selected_vars = []
+        self.checkboxes = []
+        self.weight_entries = []
+        self.row_compatible = []
+        self.row_running = []
+        for child in self.body.winfo_children():
+            child.destroy()
+        for column, heading in enumerate(JAVA_MODEL_COLUMNS):
+            cell = self._cell(0, column, 26, "#e4e4e4")
+            tk.Label(
+                cell,
+                text=heading,
+                background="#e4e4e4",
+                foreground=TEXT,
+                anchor="center",
+            ).pack(fill="both", expand=True)
+
+        for index, model in enumerate(models):
+            compatible = model_can_be_selected(models, index)
+            background = FIELD if compatible else INCOMPATIBLE
+            height = max(28, 23 * model.order)
+            row_widgets: List[object] = []
+            values = (model.name, str(model.order), _fmt(model.heritability))
+            for column, value in enumerate(values):
+                cell = self._cell(index + 1, column, height, background)
+                label = tk.Label(
+                    cell,
+                    text=value,
+                    background=background,
+                    foreground=TEXT,
+                    anchor="w",
+                    padx=4,
+                )
+                label.pack(fill="both", expand=True)
+                row_widgets.extend((cell, label))
+
+            snp_cell = self._cell(index + 1, 3, height, background)
+            snp_label = tk.Label(
+                snp_cell,
+                text="\n".join(model.attribute_names),
+                background=background,
+                foreground=TEXT,
+                anchor="w",
+                justify="left",
+                padx=4,
+            )
+            snp_label.pack(
+                fill="both", expand=True
+            )
+            maf_cell = self._cell(index + 1, 4, height, background)
+            maf_label = tk.Label(
+                maf_cell,
+                text="\n".join(_fmt(maf) for maf in model.mafs),
+                background=background,
+                foreground=TEXT,
+                anchor="w",
+                justify="left",
+                padx=4,
+            )
+            maf_label.pack(
+                fill="both", expand=True
+            )
+            weight_cell = self._cell(index + 1, 5, height, background)
+            weight_var = tk.StringVar(value=str(model.weight))
+            weight_entry = tk.Entry(
+                weight_cell,
+                textvariable=weight_var,
+                relief="flat",
+                background=background,
+                foreground=TEXT,
+                disabledforeground=MUTED,
+                insertbackground=TEXT,
+                justify="center",
+            )
+            weight_entry.pack(fill="both", expand=True, padx=3, pady=max(2, (height - 24) // 2))
+            if running:
+                weight_entry.configure(state="disabled")
+            weight_entry.bind("<Return>", lambda _event, i=index, v=weight_var: self._commit_weight(i, v))
+            weight_entry.bind("<FocusOut>", lambda _event, i=index, v=weight_var: self._commit_weight(i, v))
+
+            q_cell = self._cell(index + 1, 6, height, background)
+            q_label = tk.Label(
+                q_cell,
+                text=str(model.quantile_count),
+                background=background,
+                foreground=TEXT,
+            )
+            q_label.pack(fill="both", expand=True)
+            selected_cell = self._cell(index + 1, 7, height, background)
+            selected_var = tk.BooleanVar(value=model.selected)
+            checkbox = tk.Checkbutton(
+                selected_cell,
+                variable=selected_var,
+                background=background,
+                foreground=TEXT,
+                activebackground=background,
+                activeforeground=TEXT,
+                selectcolor=background,
+                command=lambda i=index, v=selected_var: self.on_selection(i, bool(v.get())),
+            )
+            checkbox.pack(expand=True)
+            if running or not compatible:
+                checkbox.configure(state="disabled", disabledforeground=MUTED)
+            row_widgets.extend(
+                (
+                    snp_cell,
+                    snp_label,
+                    maf_cell,
+                    maf_label,
+                    weight_cell,
+                    weight_entry,
+                    q_cell,
+                    q_label,
+                    selected_cell,
+                    checkbox,
+                )
+            )
+            self.row_widgets.append(row_widgets)
+            self.selected_vars.append(selected_var)
+            self.checkboxes.append(checkbox)
+            self.weight_entries.append(weight_entry)
+            self.row_compatible.append(compatible)
+            self.row_running.append(running)
+
+        for column, width in enumerate(self.WIDTHS):
+            self.body.grid_columnconfigure(column, minsize=width)
+
+    def refresh_interaction_state(self, models: Sequence[ModelSpec], running: bool = False) -> None:
+        """Update selection gating without rebuilding widgets under the pointer."""
+        self.models = models
+        self.running = running
+        if len(models) != len(self.row_widgets):
+            self.rebuild(models, running)
+            return
+        for index, model in enumerate(models):
+            compatible = model_can_be_selected(models, index)
+            background = FIELD if compatible else INCOMPATIBLE
+            compatibility_changed = compatible != self.row_compatible[index]
+            running_changed = running != self.row_running[index]
+            if bool(self.selected_vars[index].get()) != model.selected:
+                self.selected_vars[index].set(model.selected)
+            if compatibility_changed:
+                for widget in self.row_widgets[index]:
+                    try:
+                        widget.configure(background=background)
+                    except Exception:
+                        pass
+                self.row_compatible[index] = compatible
+            if running_changed:
+                self.weight_entries[index].configure(state="disabled" if running else "normal")
+                self.row_running[index] = running
+            if compatibility_changed or running_changed:
+                self.checkboxes[index].configure(
+                    state="disabled" if running or not compatible else "normal",
+                    disabledforeground=MUTED,
+                    background=background,
+                    activebackground=background,
+                    selectcolor=background,
+                )
+
+    def _commit_weight(self, index: int, variable: object) -> None:
+        try:
+            value = float(variable.get())
+            if value <= 0.0:
+                raise ValueError
+        except ValueError:
+            variable.set(str(self.models[index].weight))
+            return
+        if value != self.models[index].weight:
+            self.on_weight(index, value)
 
 
 class GametesGui(_TkRootBase):
     def __init__(self) -> None:
         super().__init__()
-        self.title("GAMETES Python GUI")
-        self.geometry("1200x850")
+        self.title("GAMETES 2.2 dev")
+        self.configure(background=BACKGROUND)
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        width = min(720, max(680, screen_width - 60))
+        height = min(900, max(720, screen_height - 80))
+        self.geometry(f"{width}x{height}")
+        self.minsize(680, 720)
 
         self.models: List[ModelSpec] = []
-        self.input_models: List[InputModelSpec] = []
-
-        self.log_queue: "queue.Queue[str]" = queue.Queue()
+        self.next_model_number = 1
+        self.configuration_file: Optional[Path] = None
+        self.noise_file_path = ""
+        self.noise_file_attributes = 0
+        self.noise_file_instances = 0
+        self._updating_counts = False
         self._running = False
+        self._run_kind = "dataset"
+        self._worker_done = False
+        self._worker_error: Optional[str] = None
+        self._worker_model_result: Optional[ModelSpec] = None
+        self._worker_queue: "queue.Queue[object]" = queue.Queue()
+        self._worker_thread: Optional[threading.Thread] = None
+        self._progress_window: Optional[object] = None
+        self._progress_bar: Optional[object] = None
 
+        self._configure_style()
+        self._build_menu()
         self._build_ui()
-        self.after(100, self._poll_logs)
+        self.protocol("WM_DELETE_WINDOW", self._close_application)
+        self.after(50, self._poll_worker)
+        self.after(80, lambda: _activate_window(self))
+
+    def _configure_style(self) -> None:
+        style = ttk.Style(self)
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+        style.configure(".", background=BACKGROUND, foreground=TEXT)
+        style.configure("TFrame", background=BACKGROUND)
+        style.configure("TLabel", background=BACKGROUND, foreground=TEXT)
+        style.configure("TLabelframe", background=BACKGROUND, foreground=TEXT)
+        style.configure("TLabelframe.Label", background=BACKGROUND, foreground=TEXT)
+        style.configure("TButton", padding=(9, 4))
+
+    def _build_menu(self) -> None:
+        menu_bar = tk.Menu(self)
+        file_menu = tk.Menu(menu_bar, tearoff=False)
+        file_menu.add_command(label="New", command=self._new_configuration, accelerator="Cmd+N")
+        file_menu.add_command(label="Open", command=self._open_configuration, accelerator="Cmd+O")
+        file_menu.add_command(label="Save", command=self._save_configuration, accelerator="Cmd+S")
+        file_menu.add_command(label="SaveAs", command=self._save_configuration_as, accelerator="Shift+Cmd+S")
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self._close_application)
+        menu_bar.add_cascade(label="File", menu=file_menu)
+        self.configure(menu=menu_bar)
+        self.bind_all("<Command-n>", lambda _event: self._new_configuration())
+        self.bind_all("<Command-o>", lambda _event: self._open_configuration())
+        self.bind_all("<Command-s>", lambda _event: self._save_configuration())
+        self.bind_all("<Command-Shift-S>", lambda _event: self._save_configuration_as())
 
     def _build_ui(self) -> None:
-        root = ttk.Frame(self, padding=10)
-        root.pack(fill="both", expand=True)
+        shell = ttk.Frame(self, padding=6)
+        shell.pack(fill="both", expand=True)
+        self._build_model_panel(shell)
+        self._build_dataset_panel(shell)
+        command = ttk.Frame(shell)
+        command.pack(fill="x", pady=(8, 0))
+        self.generate_datasets_button = ttk.Button(command, text="Generate Datasets...", command=self._on_generate)
+        self.generate_datasets_button.pack()
+        self._update_action_states()
 
-        top = ttk.Panedwindow(root, orient="horizontal")
-        top.pack(fill="both", expand=True)
+    def _build_model_panel(self, parent: object) -> None:
+        panel = ttk.LabelFrame(parent, text="Model Construction", padding=6)
+        panel.pack(fill="both", expand=True)
+        controls = ttk.Frame(panel)
+        controls.pack(pady=(0, 6))
+        self.model_source_buttons = []
+        for label, command in (
+            ("Generate Model", self._generate_model),
+            ("Create Model", self._create_model),
+            ("Load Model", self._load_model),
+        ):
+            button = ttk.Button(controls, text=label, command=command)
+            button.pack(side="left", padx=3)
+            self.model_source_buttons.append(button)
+        self.edit_button = ttk.Button(controls, text="Edit Model", command=self._edit_model)
+        self.edit_button.pack(side="left", padx=3)
+        self.delete_button = ttk.Button(controls, text="Delete Model", command=self._delete_model)
+        self.delete_button.pack(side="left", padx=3)
 
-        left = ttk.Frame(top)
-        right = ttk.Frame(top)
-        top.add(left, weight=2)
-        top.add(right, weight=3)
+        self.model_table = ModelTableView(panel, self._set_model_selected, self._set_model_weight)
+        self.model_table.pack(fill="both", expand=True)
+        self.model_table.rebuild(self.models)
+        self.quantile_summary = tk.StringVar(value="Number of EDM Quantiles: 0")
+        ttk.Label(panel, textvariable=self.quantile_summary, font=("TkDefaultFont", 10, "bold")).pack(pady=(6, 0))
 
-        self._build_model_panel(left)
-        self._build_dataset_panel(right)
-        self._build_run_panel(root)
+    def _build_dataset_panel(self, parent: object) -> None:
+        outer = ttk.LabelFrame(parent, text="Dataset Construction", padding=6)
+        outer.pack(fill="x", pady=(7, 0))
+        noise = ttk.LabelFrame(outer, text="Non-predictive Attributes", padding=6)
+        noise.pack(fill="x")
+        self.noise_mode_var = tk.StringVar(value="generate")
+        modes = ttk.Frame(noise)
+        modes.pack()
+        ttk.Radiobutton(modes, text="Generate", value="generate", variable=self.noise_mode_var, command=self._update_noise_mode).pack(side="left")
+        ttk.Radiobutton(modes, text="Read from file", value="file", variable=self.noise_mode_var, command=self._update_noise_mode).pack(
+            side="left", padx=(12, 0)
+        )
 
-    def _build_model_panel(self, parent: ttk.Frame) -> None:
-        model_frame = ttk.LabelFrame(parent, text="Model Construction", padding=8)
-        model_frame.pack(fill="both", expand=True)
-
-        cols = ("heri", "prev", "maf", "weight", "output", "odds")
-        self.model_tree = ttk.Treeview(model_frame, columns=cols, show="headings", height=10)
-        self.model_tree.heading("heri", text="Heritability")
-        self.model_tree.heading("prev", text="Case Proportion")
-        self.model_tree.heading("maf", text="MAFs")
-        self.model_tree.heading("weight", text="Weight")
-        self.model_tree.heading("output", text="Output Prefix")
-        self.model_tree.heading("odds", text="OddsRatio")
-        self.model_tree.column("heri", width=90, anchor="center")
-        self.model_tree.column("prev", width=110, anchor="center")
-        self.model_tree.column("maf", width=150)
-        self.model_tree.column("weight", width=70, anchor="center")
-        self.model_tree.column("output", width=210)
-        self.model_tree.column("odds", width=70, anchor="center")
-        self.model_tree.pack(fill="x", expand=False)
-
-        btn_row = ttk.Frame(model_frame)
-        btn_row.pack(fill="x", pady=(6, 8))
-        ttk.Button(btn_row, text="Add Model", command=self._add_model).pack(side="left")
-        ttk.Button(btn_row, text="Edit Model", command=self._edit_model).pack(side="left", padx=(6, 0))
-        ttk.Button(btn_row, text="Remove Model", command=self._remove_model).pack(side="left", padx=(6, 0))
-
-        load_frame = ttk.LabelFrame(model_frame, text="Loaded Model Files (-i)", padding=8)
-        load_frame.pack(fill="both", expand=True)
-
-        self.input_model_tree = ttk.Treeview(load_frame, columns=("path", "weight"), show="headings", height=7)
-        self.input_model_tree.heading("path", text="Path")
-        self.input_model_tree.heading("weight", text="Weight")
-        self.input_model_tree.column("path", width=450)
-        self.input_model_tree.column("weight", width=80, anchor="center")
-        self.input_model_tree.pack(fill="x", expand=False)
-
-        i_btn = ttk.Frame(load_frame)
-        i_btn.pack(fill="x", pady=(6, 0))
-        ttk.Button(i_btn, text="Add File", command=self._add_input_model).pack(side="left")
-        ttk.Button(i_btn, text="Edit File", command=self._edit_input_model).pack(side="left", padx=(6, 0))
-        ttk.Button(i_btn, text="Remove File", command=self._remove_input_model).pack(side="left", padx=(6, 0))
-
-        ras_frame = ttk.LabelFrame(model_frame, text="Model Generation Settings", padding=8)
-        ras_frame.pack(fill="x", expand=False, pady=(8, 0))
-
-        self.quantiles_var = tk.StringVar(value="1")
-        self.population_var = tk.StringVar(value="100")
-        self.try_count_var = tk.StringVar(value="5000")
-        self.seed_var = tk.StringVar(value="")
-
-        ttk.Label(ras_frame, text="Quantiles (-q)").grid(row=0, column=0, sticky="w")
-        ttk.Entry(ras_frame, textvariable=self.quantiles_var, width=10).grid(row=0, column=1, sticky="w", padx=(6, 18))
-        ttk.Label(ras_frame, text="Population (-p)").grid(row=0, column=2, sticky="w")
-        ttk.Entry(ras_frame, textvariable=self.population_var, width=10).grid(row=0, column=3, sticky="w", padx=(6, 18))
-        ttk.Label(ras_frame, text="Try Count (-t)").grid(row=0, column=4, sticky="w")
-        ttk.Entry(ras_frame, textvariable=self.try_count_var, width=12).grid(row=0, column=5, sticky="w", padx=(6, 18))
-        ttk.Label(ras_frame, text="Random Seed (-r)").grid(row=0, column=6, sticky="w")
-        ttk.Entry(ras_frame, textvariable=self.seed_var, width=12).grid(row=0, column=7, sticky="w", padx=(6, 0))
-
-    def _build_dataset_panel(self, parent: ttk.Frame) -> None:
-        dataset = ttk.LabelFrame(parent, text="Dataset Construction", padding=8)
-        dataset.pack(fill="both", expand=True)
-
-        file_frame = ttk.LabelFrame(dataset, text="Input Files", padding=8)
-        file_frame.pack(fill="x", expand=False)
-
-        self.predictive_var = tk.StringVar(value="")
-        self.noise_var = tk.StringVar(value="")
-
-        ttk.Label(file_frame, text="Predictive File (-v)").grid(row=0, column=0, sticky="w")
-        ttk.Entry(file_frame, textvariable=self.predictive_var, width=55).grid(row=0, column=1, sticky="ew", padx=(6, 6))
-        ttk.Button(file_frame, text="Browse", command=self._browse_predictive).grid(row=0, column=2)
-
-        ttk.Label(file_frame, text="Noise File (-z)").grid(row=1, column=0, sticky="w", pady=(6, 0))
-        ttk.Entry(file_frame, textvariable=self.noise_var, width=55).grid(row=1, column=1, sticky="ew", padx=(6, 6), pady=(6, 0))
-        ttk.Button(file_frame, text="Browse", command=self._browse_noise).grid(row=1, column=2, pady=(6, 0))
-        file_frame.columnconfigure(1, weight=1)
-
-        noise_gen = ttk.LabelFrame(dataset, text="Non-Predictive Attributes", padding=8)
-        noise_gen.pack(fill="x", expand=False, pady=(8, 0))
-
+        self.generated_noise_frame = ttk.Frame(noise)
         self.attr_count_var = tk.StringVar(value="100")
         self.af_min_var = tk.StringVar(value="0.01")
         self.af_max_var = tk.StringVar(value="0.5")
+        ttk.Label(self.generated_noise_frame, text="Total number of attributes").pack(side="left", padx=(20, 5))
+        ttk.Entry(self.generated_noise_frame, textvariable=self.attr_count_var, width=8).pack(side="left")
+        ttk.Label(self.generated_noise_frame, text="Minor-allele-frequency range").pack(side="left", padx=(45, 5))
+        ttk.Entry(self.generated_noise_frame, textvariable=self.af_min_var, width=7).pack(side="left")
+        ttk.Entry(self.generated_noise_frame, textvariable=self.af_max_var, width=7).pack(side="left", padx=(6, 0))
 
-        ttk.Label(noise_gen, text="Total Attributes (-a)").grid(row=0, column=0, sticky="w")
-        ttk.Entry(noise_gen, textvariable=self.attr_count_var, width=12).grid(row=0, column=1, sticky="w", padx=(6, 20))
-        ttk.Label(noise_gen, text="Allele Freq Min (-n)").grid(row=0, column=2, sticky="w")
-        ttk.Entry(noise_gen, textvariable=self.af_min_var, width=10).grid(row=0, column=3, sticky="w", padx=(6, 20))
-        ttk.Label(noise_gen, text="Allele Freq Max (-x)").grid(row=0, column=4, sticky="w")
-        ttk.Entry(noise_gen, textvariable=self.af_max_var, width=10).grid(row=0, column=5, sticky="w", padx=(6, 0))
+        self.file_noise_frame = ttk.Frame(noise)
+        ttk.Button(self.file_noise_frame, text="Load SNP file", command=self._browse_noise_file).grid(row=0, column=0, rowspan=3, padx=(0, 25))
+        self.noise_file_label = ttk.Label(self.file_noise_frame, text="File: (none)")
+        self.noise_file_label.grid(row=0, column=1, sticky="w")
+        self.noise_attribute_label = ttk.Label(self.file_noise_frame, text="Number of attributes: 0")
+        self.noise_attribute_label.grid(row=1, column=1, sticky="w")
+        self.noise_instance_label = ttk.Label(self.file_noise_frame, text="Total number of instances: 0")
+        self.noise_instance_label.grid(row=2, column=1, sticky="w")
 
-        props = ttk.LabelFrame(dataset, text="Dataset Properties", padding=8)
-        props.pack(fill="x", expand=False, pady=(8, 0))
-
-        self.endpoint_var = tk.StringVar(value="binary")
+        properties = ttk.LabelFrame(outer, text="Dataset Properties", padding=6)
+        properties.pack(fill="x", pady=(7, 0))
         self.mixed_var = tk.StringVar(value="hierarchical")
+        self.endpoint_var = tk.StringVar(value="binary")
         self.hetero_label_var = tk.BooleanVar(value=False)
+        mix_row = ttk.Frame(properties)
+        mix_row.pack()
+        self.additive_button = ttk.Radiobutton(
+            mix_row, text="Additive Data", value="hierarchical", variable=self.mixed_var, command=self._update_mixed_ui
+        )
+        self.additive_button.pack(side="left")
+        self.heterogeneous_button = ttk.Radiobutton(
+            mix_row, text="Heterogenous Data", value="heterogeneous", variable=self.mixed_var, command=self._update_mixed_ui
+        )
+        self.heterogeneous_button.pack(side="left", padx=(12, 0))
+        self.hetero_label_check = ttk.Checkbutton(
+            mix_row, text="Add model labels for Heterogeneous Data", variable=self.hetero_label_var
+        )
+        self.hetero_label_check.pack(side="left", padx=(12, 0))
 
-        ttk.Label(props, text="Endpoint Type").grid(row=0, column=0, sticky="w")
-        ttk.Radiobutton(props, text="Binary Class", value="binary", variable=self.endpoint_var, command=self._update_endpoint_ui).grid(
-            row=0, column=1, sticky="w"
-        )
-        ttk.Radiobutton(props, text="Quantitative Trait", value="continuous", variable=self.endpoint_var, command=self._update_endpoint_ui).grid(
-            row=0, column=2, sticky="w", padx=(8, 0)
-        )
+        endpoint_row = ttk.Frame(properties)
+        endpoint_row.pack(pady=(5, 0))
+        ttk.Radiobutton(
+            endpoint_row, text="Binary Class", value="binary", variable=self.endpoint_var, command=self._update_endpoint_ui
+        ).pack(side="left")
+        ttk.Radiobutton(
+            endpoint_row, text="Quantitative Trait", value="continuous", variable=self.endpoint_var, command=self._update_endpoint_ui
+        ).pack(side="left", padx=(12, 0))
 
-        ttk.Label(props, text="Mixed Model Type (-h)").grid(row=1, column=0, sticky="w", pady=(8, 0))
-        ttk.Radiobutton(props, text="Hierarchical (Additive)", value="hierarchical", variable=self.mixed_var, command=self._update_mixed_ui).grid(
-            row=1, column=1, sticky="w", pady=(8, 0)
-        )
-        ttk.Radiobutton(props, text="Heterogeneous", value="heterogeneous", variable=self.mixed_var, command=self._update_mixed_ui).grid(
-            row=1, column=2, sticky="w", padx=(8, 0), pady=(8, 0)
-        )
-        self.hetero_label_cb = ttk.Checkbutton(props, text="Add heterogeneous labels (-b)", variable=self.hetero_label_var)
-        self.hetero_label_cb.grid(row=1, column=3, sticky="w", padx=(12, 0), pady=(8, 0))
-
+        self.endpoint_cards = ttk.Frame(properties)
+        self.endpoint_cards.pack(fill="x", pady=(5, 0))
         self.case_var = tk.StringVar(value="400")
         self.control_var = tk.StringVar(value="400")
+        self.balanced_var = tk.BooleanVar(value=False)
+        self.binary_frame = ttk.Frame(self.endpoint_cards)
+        ttk.Checkbutton(
+            self.binary_frame, text="Balanced case/control ratio", variable=self.balanced_var, command=self._update_counts
+        ).pack()
+        case_row = ttk.Frame(self.binary_frame)
+        case_row.pack(pady=(5, 0))
+        ttk.Label(case_row, text="Number of cases").pack(side="left")
+        ttk.Entry(case_row, textvariable=self.case_var, width=8).pack(side="left", padx=(5, 30))
+        ttk.Label(case_row, text="Number of controls").pack(side="left")
+        self.control_entry = ttk.Entry(case_row, textvariable=self.control_var, width=8)
+        self.control_entry.pack(side="left", padx=(5, 0))
+        self.sample_summary = tk.StringVar(value="Total sample size: 800    Case proportion: 0.5000")
+        ttk.Label(self.binary_frame, textvariable=self.sample_summary, font=("TkDefaultFont", 10, "bold")).pack(pady=(5, 0))
+
+        self.fixed_binary_frame = ttk.Frame(self.endpoint_cards)
+        ttk.Label(self.fixed_binary_frame, text="Move slider to set case control counts.").pack()
+        self.read_case_percent_var = tk.DoubleVar(value=50.0)
+        ttk.Scale(
+            self.fixed_binary_frame,
+            from_=1,
+            to=99,
+            variable=self.read_case_percent_var,
+            command=lambda _value: self._update_fixed_counts(),
+        ).pack(fill="x", padx=90)
+        self.fixed_summary = tk.StringVar(value="Case proportion: 0.5000    Number of cases: 0    Number of controls: 0")
+        ttk.Label(self.fixed_binary_frame, textvariable=self.fixed_summary, font=("TkDefaultFont", 10, "bold")).pack(pady=(4, 0))
+
         self.total_var = tk.StringVar(value="800")
         self.std_var = tk.StringVar(value="0.2")
+        self.quantitative_frame = ttk.Frame(self.endpoint_cards)
+        ttk.Label(self.quantitative_frame, text="Total number of samples:").pack(side="left")
+        self.total_entry = ttk.Entry(self.quantitative_frame, textvariable=self.total_var, width=8)
+        self.total_entry.pack(side="left", padx=(5, 30))
+        ttk.Label(self.quantitative_frame, text="Standard Deviation:").pack(side="left")
+        ttk.Entry(self.quantitative_frame, textvariable=self.std_var, width=8).pack(side="left", padx=(5, 0))
 
-        self.binary_frame = ttk.Frame(props)
-        self.binary_frame.grid(row=2, column=0, columnspan=4, sticky="w", pady=(8, 0))
-        ttk.Label(self.binary_frame, text="Case Count (-s)").grid(row=0, column=0, sticky="w")
-        ttk.Entry(self.binary_frame, textvariable=self.case_var, width=12).grid(row=0, column=1, sticky="w", padx=(6, 16))
-        ttk.Label(self.binary_frame, text="Control Count (-w)").grid(row=0, column=2, sticky="w")
-        ttk.Entry(self.binary_frame, textvariable=self.control_var, width=12).grid(row=0, column=3, sticky="w", padx=(6, 0))
+        replicate_row = ttk.Frame(outer)
+        replicate_row.pack(fill="x", pady=(7, 0))
+        self.repl_var = tk.StringVar(value="100")
+        ttk.Label(replicate_row, text="Number of replicates").pack(side="left", padx=(60, 5))
+        ttk.Entry(replicate_row, textvariable=self.repl_var, width=8).pack(side="left")
+        self.total_dataset_summary = tk.StringVar(value="Total number of datasets: --")
+        ttk.Label(replicate_row, textvariable=self.total_dataset_summary, font=("TkDefaultFont", 10, "bold")).pack(side="right", padx=(0, 80))
 
-        self.cont_frame = ttk.Frame(props)
-        self.cont_frame.grid(row=3, column=0, columnspan=4, sticky="w", pady=(8, 0))
-        ttk.Label(self.cont_frame, text="Total Count (-t)").grid(row=0, column=0, sticky="w")
-        ttk.Entry(self.cont_frame, textvariable=self.total_var, width=12).grid(row=0, column=1, sticky="w", padx=(6, 16))
-        ttk.Label(self.cont_frame, text="Std Dev (-d)").grid(row=0, column=2, sticky="w")
-        ttk.Entry(self.cont_frame, textvariable=self.std_var, width=12).grid(row=0, column=3, sticky="w", padx=(6, 0))
-
-        out = ttk.LabelFrame(dataset, text="Output", padding=8)
-        out.pack(fill="x", expand=False, pady=(8, 0))
-
-        self.repl_var = tk.StringVar(value="1")
-        self.dataset_out_var = tk.StringVar(value="dataset")
-
-        ttk.Label(out, text="Replicates (-r)").grid(row=0, column=0, sticky="w")
-        ttk.Entry(out, textvariable=self.repl_var, width=12).grid(row=0, column=1, sticky="w", padx=(6, 20))
-
-        ttk.Label(out, text="Dataset Output Prefix (-o)").grid(row=1, column=0, sticky="w", pady=(8, 0))
-        ttk.Entry(out, textvariable=self.dataset_out_var, width=55).grid(row=1, column=1, sticky="ew", padx=(6, 6), pady=(8, 0))
-        ttk.Button(out, text="Browse", command=self._browse_dataset_out).grid(row=1, column=2, pady=(8, 0))
-        out.columnconfigure(1, weight=1)
-
+        for variable in (self.case_var, self.control_var, self.repl_var):
+            variable.trace_add("write", self._update_counts)
+        self._update_noise_mode()
         self._update_endpoint_ui()
         self._update_mixed_ui()
 
-    def _build_run_panel(self, parent: ttk.Frame) -> None:
-        run_panel = ttk.LabelFrame(parent, text="Run", padding=8)
-        run_panel.pack(fill="both", expand=True, pady=(8, 0))
+    def _selected_indices(self) -> List[int]:
+        return [index for index, model in enumerate(self.models) if model.selected]
 
-        btns = ttk.Frame(run_panel)
-        btns.pack(fill="x", expand=False)
+    def _next_predictive_attribute_number(self) -> int:
+        next_number = 1
+        for model in self.models:
+            for name in model.attribute_names:
+                if name.lower().startswith("p"):
+                    try:
+                        next_number = max(next_number, int(name[1:]) + 1)
+                    except ValueError:
+                        pass
+        return next_number
 
-        self.run_btn = ttk.Button(btns, text="Generate", command=self._on_generate)
-        self.run_btn.pack(side="left")
-        ttk.Button(btns, text="Clear Log", command=self._clear_log).pack(side="left", padx=(6, 0))
-
-        self.log = tk.Text(run_panel, height=14, wrap="word")
-        self.log.pack(fill="both", expand=True, pady=(8, 0))
-
-    def _browse_predictive(self) -> None:
-        assert filedialog is not None
-        p = filedialog.askopenfilename(title="Select predictive input file")
-        if p:
-            self.predictive_var.set(p)
-
-    def _browse_noise(self) -> None:
-        assert filedialog is not None
-        p = filedialog.askopenfilename(title="Select noise input file")
-        if p:
-            self.noise_var.set(p)
-
-    def _browse_dataset_out(self) -> None:
-        assert filedialog is not None
-        p = filedialog.asksaveasfilename(title="Dataset output prefix")
-        if p:
-            self.dataset_out_var.set(p)
-
-    def _add_model(self) -> None:
-        dlg = ModelDialog(self)
-        self.wait_window(dlg)
-        if dlg.result is not None:
-            self.models.append(dlg.result)
-            self._refresh_models()
-
-    def _edit_model(self) -> None:
-        sel = self.model_tree.selection()
-        if not sel:
-            return
-        idx = int(sel[0])
-        dlg = ModelDialog(self, self.models[idx])
-        self.wait_window(dlg)
-        if dlg.result is not None:
-            self.models[idx] = dlg.result
-            self._refresh_models()
-            self.model_tree.selection_set(str(idx))
-
-    def _remove_model(self) -> None:
-        sel = self.model_tree.selection()
-        if not sel:
-            return
-        idx = int(sel[0])
-        del self.models[idx]
-        self._refresh_models()
-
-    def _add_input_model(self) -> None:
-        dlg = InputModelDialog(self)
-        self.wait_window(dlg)
-        if dlg.result is not None:
-            self.input_models.append(dlg.result)
-            self._refresh_input_models()
-
-    def _edit_input_model(self) -> None:
-        sel = self.input_model_tree.selection()
-        if not sel:
-            return
-        idx = int(sel[0])
-        dlg = InputModelDialog(self, self.input_models[idx])
-        self.wait_window(dlg)
-        if dlg.result is not None:
-            self.input_models[idx] = dlg.result
-            self._refresh_input_models()
-            self.input_model_tree.selection_set(str(idx))
-
-    def _remove_input_model(self) -> None:
-        sel = self.input_model_tree.selection()
-        if not sel:
-            return
-        idx = int(sel[0])
-        del self.input_models[idx]
-        self._refresh_input_models()
-
-    def _refresh_models(self) -> None:
-        for item in self.model_tree.get_children():
-            self.model_tree.delete(item)
-        for i, m in enumerate(self.models):
-            self.model_tree.insert(
-                "",
-                "end",
-                iid=str(i),
-                values=(
-                    m.heritability,
-                    "" if m.case_proportion is None else m.case_proportion,
-                    ",".join(str(x) for x in m.mafs),
-                    m.weight,
-                    m.output_prefix,
-                    "yes" if m.use_odds_ratio else "no",
-                ),
-            )
-
-    def _refresh_input_models(self) -> None:
-        for item in self.input_model_tree.get_children():
-            self.input_model_tree.delete(item)
-        for i, m in enumerate(self.input_models):
-            self.input_model_tree.insert("", "end", iid=str(i), values=(m.path, m.weight))
-
-    def _update_endpoint_ui(self) -> None:
-        is_binary = self.endpoint_var.get() == "binary"
-        if is_binary:
-            self.binary_frame.grid()
-            self.cont_frame.grid_remove()
-        else:
-            self.binary_frame.grid_remove()
-            self.cont_frame.grid()
-
-    def _update_mixed_ui(self) -> None:
-        if self.mixed_var.get() == "heterogeneous":
-            self.hetero_label_cb.state(["!disabled"])
-        else:
-            self.hetero_label_var.set(False)
-            self.hetero_label_cb.state(["disabled"])
-
-    def _clear_log(self) -> None:
-        self.log.delete("1.0", "end")
-
-    def _append_log(self, text: str) -> None:
-        self.log.insert("end", text)
-        self.log.see("end")
-
-    def _poll_logs(self) -> None:
-        while True:
-            try:
-                msg = self.log_queue.get_nowait()
-            except queue.Empty:
-                break
-            self._append_log(msg)
-        self.after(100, self._poll_logs)
-
-    def _build_args(self) -> List[str]:
-        args: List[str] = []
-
-        for m in self.models:
-            args += ["-M", m.to_blob()]
-
-        for im in self.input_models:
-            args += ["-i", im.path]
-
-        weights: List[float] = [m.weight for m in self.models] + [im.weight for im in self.input_models]
-        for w in weights:
-            args += ["-w", str(w)]
-
-        q = self.quantiles_var.get().strip()
-        p = self.population_var.get().strip()
-        t = self.try_count_var.get().strip()
-        s = self.seed_var.get().strip()
-
-        if q:
-            args += ["-q", q]
-        if p:
-            args += ["-p", p]
-        if t:
-            args += ["-t", t]
-        if s:
-            args += ["-r", s]
-
-        pred = self.predictive_var.get().strip()
-        noise = self.noise_var.get().strip()
-        if pred:
-            args += ["-v", pred]
-        if noise:
-            args += ["-z", noise]
-
-        d_tokens: List[str] = [
-            "-n",
-            self.af_min_var.get().strip(),
-            "-x",
-            self.af_max_var.get().strip(),
-            "-a",
-            self.attr_count_var.get().strip(),
-            "-r",
-            self.repl_var.get().strip(),
-            "-o",
-            self.dataset_out_var.get().strip(),
-            "-h",
-            self.mixed_var.get().strip(),
-        ]
-
-        if self.endpoint_var.get() == "continuous":
-            d_tokens += ["-c", "-d", self.std_var.get().strip(), "-t", self.total_var.get().strip()]
-        else:
-            d_tokens += ["-s", self.case_var.get().strip(), "-w", self.control_var.get().strip()]
-
-        if self.mixed_var.get() == "heterogeneous" and bool(self.hetero_label_var.get()):
-            d_tokens.append("-b")
-
-        args += ["-D", shlex.join(d_tokens)]
-        return args
-
-    def _on_generate(self) -> None:
-        assert messagebox is not None
+    def _set_model_selected(self, index: int, selected: bool) -> None:
         if self._running:
             return
-
-        try:
-            args = self._build_args()
-            doc = SnpGenDocument()
-            doc.parse_arguments(args)
-        except Exception as exc:
-            messagebox.showerror("Invalid configuration", str(exc), parent=self)
+        if selected and not model_can_be_selected(self.models, index):
             return
+        self.models[index].selected = selected
+        self.model_table.refresh_interaction_state(self.models, self._running)
+        self._update_quantile_summary()
+        self._update_total_dataset_count()
+        self._update_action_states()
 
-        self._running = True
-        self.run_btn.state(["disabled"])
-        self._append_log("Starting generation...\n")
+    def _set_model_weight(self, index: int, weight: float) -> None:
+        self.models[index].weight = weight
+        self._update_action_states()
 
-        def worker() -> None:
-            writer = _QueueWriter(self.log_queue)
+    def _refresh_model_table(self) -> None:
+        self.model_table.rebuild(self.models, self._running)
+        self._update_quantile_summary()
+        self._update_counts()
+
+    def _update_quantile_summary(self) -> None:
+        selected = self._selected_indices()
+        if not selected:
+            value = "0"
+        else:
+            common = common_selected_quantile_count(self.models)
+            value = str(common) if common is not None else "--"
+        self.quantile_summary.set(f"Number of EDM Quantiles: {value}")
+
+    def _update_action_states(self) -> None:
+        selected = self._selected_indices()
+        editable = selected_model_can_be_edited(self.models)
+        self.edit_button.state(["!disabled"] if editable and not self._running else ["disabled"])
+        self.delete_button.state(["!disabled"] if selected and not self._running else ["disabled"])
+        for button in self.model_source_buttons:
+            button.state(["disabled"] if self._running else ["!disabled"])
+
+        multi = len(selected) > 1 and not self._running
+        self.additive_button.state(["!disabled"] if multi else ["disabled"])
+        self.heterogeneous_button.state(["!disabled"] if multi else ["disabled"])
+        labels_enabled = multi and self.mixed_var.get() == "heterogeneous"
+        self.hetero_label_check.state(["!disabled"] if labels_enabled else ["disabled"])
+        if not labels_enabled:
+            self.hetero_label_var.set(False)
+
+        common = common_selected_quantile_count(self.models)
+        can_generate = bool(selected) and common is not None and self._dataset_sample_count() > 0 and not self._running
+        self.generate_datasets_button.state(["!disabled"] if can_generate else ["disabled"])
+
+    def _generate_model(self) -> None:
+        if self._running:
+            return
+        model_number = self.next_model_number
+        self.next_model_number += 1
+        dialog = GenerateModelDialog(self, self._next_predictive_attribute_number())
+        self.wait_window(dialog)
+        if dialog.result is None:
+            return
+        path = filedialog.asksaveasfilename(
+            title="Location for model files",
+            initialfile=f"Model_{model_number}.txt",
+            defaultextension=".txt",
+            filetypes=[("GAMETES model", "*.txt"), ("All files", "*")],
+        )
+        if not path:
+            return
+        dialog.result.output_prefix = str(normalize_model_output_prefix(path))
+        dialog.result.name = clean_model_name(path)
+        self._start_model_generation(dialog.result)
+
+    def _create_model(self) -> None:
+        if self._running:
+            return
+        model_number = self.next_model_number
+        self.next_model_number += 1
+        first = self._next_predictive_attribute_number()
+        initial = ModelSpec(
+            name=f"Model {model_number}",
+            source="custom",
+            heritability=float("nan"),
+            prevalence=0.0,
+            mafs=[0.2, 0.2],
+            feature_names=[f"P{first}", f"P{first + 1}"],
+        )
+        dialog = CustomModelDialog(self, initial, creating=True)
+        self.wait_window(dialog)
+        if dialog.result is None:
+            return
+        path = self._choose_model_output(dialog.result)
+        if path is None:
+            return
+        try:
+            save_model_spec(dialog.result, path)
+        except Exception as exc:
+            messagebox.showerror("Unable to save model", str(exc), parent=self)
+            return
+        dialog.result.name = clean_model_name(path)
+        self.models.append(dialog.result)
+        self._refresh_model_table()
+
+    def _load_model(self) -> None:
+        if self._running:
+            return
+        path = filedialog.askopenfilename(
+            title="Load Model",
+            filetypes=[("GAMETES model", "*.txt"), ("All files", "*")],
+        )
+        if not path:
+            return
+        try:
+            self.models.append(load_model_spec(path))
+        except Exception as exc:
+            messagebox.showerror("Unable to load model", str(exc), parent=self)
+            return
+        self._refresh_model_table()
+
+    def _edit_model(self) -> None:
+        selected = self._selected_indices()
+        if len(selected) != 1:
+            return
+        index = selected[0]
+        model = self.models[index]
+        if not model.tables or model.order not in (2, 3) or model.quantile_count != 1:
+            return
+        dialog = CustomModelDialog(self, model, creating=False)
+        self.wait_window(dialog)
+        if dialog.result is None:
+            return
+        path = self._choose_model_output(dialog.result)
+        if path is None:
+            return
+        try:
+            save_model_spec(dialog.result, path)
+        except Exception as exc:
+            messagebox.showerror("Unable to save model", str(exc), parent=self)
+            return
+        dialog.result.name = clean_model_name(path)
+        dialog.result.selected = True
+        self.models[index] = dialog.result
+        self._refresh_model_table()
+
+    def _choose_model_output(self, model: ModelSpec) -> Optional[Path]:
+        initial = Path(model.input_path).name if model.input_path else f"{model.name}_Models.txt"
+        path = filedialog.asksaveasfilename(
+            title="Location for model files",
+            initialfile=initial,
+            defaultextension=".txt",
+            filetypes=[("GAMETES model", "*.txt"), ("All files", "*")],
+        )
+        return Path(path) if path else None
+
+    def _delete_model(self) -> None:
+        if self._running:
+            return
+        self.models = [model for model in self.models if not model.selected]
+        self._refresh_model_table()
+
+    def _update_noise_mode(self) -> None:
+        if self.noise_mode_var.get() == "generate":
+            self.file_noise_frame.pack_forget()
+            self.generated_noise_frame.pack(pady=(6, 0))
+        else:
+            self.generated_noise_frame.pack_forget()
+            self.file_noise_frame.pack(pady=(6, 0))
+        self._update_endpoint_ui()
+
+    def _update_endpoint_ui(self) -> None:
+        if not hasattr(self, "endpoint_cards"):
+            return
+        for frame in (self.binary_frame, self.fixed_binary_frame, self.quantitative_frame):
+            frame.pack_forget()
+        if self.endpoint_var.get() == "continuous":
+            if self.noise_mode_var.get() == "file":
+                self.total_var.set(str(self.noise_file_instances))
+                self.total_entry.state(["disabled"])
+            else:
+                self.total_entry.state(["!disabled"])
+            self.quantitative_frame.pack()
+        elif self.noise_mode_var.get() == "file":
+            self.fixed_binary_frame.pack(fill="x")
+        else:
+            self.binary_frame.pack()
+        self._update_counts()
+
+    def _update_mixed_ui(self) -> None:
+        if hasattr(self, "generate_datasets_button"):
+            self._update_action_states()
+
+    def _update_counts(self, *_args: object) -> None:
+        if self._updating_counts or not hasattr(self, "sample_summary"):
+            return
+        self._updating_counts = True
+        try:
+            if self.balanced_var.get():
+                self.control_entry.state(["disabled"])
+                if self.control_var.get() != self.case_var.get():
+                    self.control_var.set(self.case_var.get())
+            else:
+                self.control_entry.state(["!disabled"])
             try:
-                with contextlib.redirect_stdout(writer), contextlib.redirect_stderr(writer):
-                    run_document(doc)
-                self.log_queue.put("\nGeneration complete.\n")
-            except Exception as exc:
-                self.log_queue.put(f"\nERROR: {exc}\n")
-            finally:
-                self.after(0, self._finish_run)
+                cases = int(self.case_var.get())
+                controls = int(self.control_var.get())
+                total = cases + controls
+                proportion = cases / total if total > 0 else 0.0
+                self.sample_summary.set(f"Total sample size: {total:,}    Case proportion: {proportion:.4f}")
+            except ValueError:
+                self.sample_summary.set("Total sample size: --    Case proportion: --")
+            self._update_fixed_counts()
+            self._update_total_dataset_count()
+        finally:
+            self._updating_counts = False
+        if hasattr(self, "generate_datasets_button"):
+            self._update_action_states()
 
-        threading.Thread(target=worker, daemon=True).start()
+    def _update_total_dataset_count(self) -> None:
+        try:
+            replicates = int(self.repl_var.get())
+            common = common_selected_quantile_count(self.models)
+            total_datasets = replicates * common if common is not None and self._selected_indices() else None
+            self.total_dataset_summary.set(
+                f"Total number of datasets: {total_datasets}" if total_datasets is not None else "Total number of datasets: --"
+            )
+        except ValueError:
+            self.total_dataset_summary.set("Total number of datasets: --")
+
+    def _update_fixed_counts(self) -> None:
+        if not hasattr(self, "fixed_summary"):
+            return
+        proportion = round(float(self.read_case_percent_var.get())) / 100.0
+        total = self.noise_file_instances
+        cases = int(round(total * proportion))
+        self.fixed_summary.set(
+            f"Case proportion: {proportion:.4f}    Number of cases: {cases}    Number of controls: {total - cases}"
+        )
+
+    def _dataset_sample_count(self) -> int:
+        try:
+            if self.noise_mode_var.get() == "file":
+                return self.noise_file_instances
+            if self.endpoint_var.get() == "continuous":
+                return int(self.total_var.get())
+            return int(self.case_var.get()) + int(self.control_var.get())
+        except ValueError:
+            return 0
+
+    def _browse_noise_file(self) -> None:
+        path = filedialog.askopenfilename(
+            title="Load SNP file",
+            filetypes=[("Tab-delimited text", "*.txt"), ("All files", "*")],
+        )
+        if not path:
+            return
+        try:
+            rows = SnpGenSimulator.parse_data_input_file(Path(path))
+            if not rows:
+                raise ValueError("The file contains no data rows")
+            width = len(rows[0])
+            if any(len(row) != width for row in rows):
+                raise ValueError("Rows contain different numbers of attributes")
+            if any(value not in (0, 1, 2) for row in rows for value in row):
+                raise ValueError("SNP values must be encoded as 0, 1, or 2")
+        except Exception as exc:
+            messagebox.showerror("Invalid SNP file", str(exc), parent=self)
+            return
+        self.noise_file_path = path
+        self.noise_file_attributes = width
+        self.noise_file_instances = len(rows)
+        self.noise_file_label.configure(text=f"File: {Path(path).name}")
+        self.noise_attribute_label.configure(text=f"Number of attributes: {width}")
+        self.noise_instance_label.configure(text=f"Total number of instances: {len(rows)}")
+        self._update_endpoint_ui()
+
+    def _build_document(self, output_file: Optional[Path] = None) -> SnpGenDocument:
+        active = [model for model in self.models if model.selected]
+        if not active:
+            raise ValueError("Select at least one model")
+        quantiles = {model.quantile_count for model in active}
+        if len(quantiles) != 1:
+            raise ValueError("All selected models must have the same number of quantiles")
+        if any(model.weight <= 0.0 for model in active):
+            raise ValueError("Heterogeneity proportions must be greater than zero")
+
+        document = SnpGenDocument()
+        document.model_list = [model.to_doc_model() for model in active]
+        document.model_fractions = normalized_model_weights(active)
+        document.ras_quantile_count = next(iter(quantiles))
+        document.ras_population_count = 1
+        document.ras_try_count = 1
+        document.random_seed = None
+
+        dataset = DocDataset()
+        dataset.replicate_count = int(self.repl_var.get())
+        if dataset.replicate_count <= 0:
+            raise ValueError("Number of replicates must be greater than zero")
+        dataset.output_file = output_file
+        dataset.multiple_model_dataset_type = MixedModelDatasetType(self.mixed_var.get())
+        dataset.heterogeneous_label_boolean = bool(self.hetero_label_var.get())
+        dataset.create_continuous_endpoints = self.endpoint_var.get() == "continuous"
+
+        predictive_count = sum(model.order for model in active)
+        if self.noise_mode_var.get() == "file":
+            if not getattr(self, "noise_file_path", "") or self.noise_file_instances <= 0:
+                raise ValueError("Load a non-predictive SNP file")
+            document.noise_input_file = Path(self.noise_file_path)
+            dataset.total_count = self.noise_file_instances
+            dataset.total_attribute_count = self.noise_file_attributes + predictive_count
+            if dataset.create_continuous_endpoints:
+                dataset.case_proportion = None
+                dataset.continuous_endpoints_standard_deviation = float(self.std_var.get())
+            else:
+                dataset.case_proportion = round(float(self.read_case_percent_var.get())) / 100.0
+        else:
+            dataset.allele_frequency_min = float(self.af_min_var.get())
+            dataset.allele_frequency_max = float(self.af_max_var.get())
+            if not 0.0 <= dataset.allele_frequency_min <= dataset.allele_frequency_max <= 0.5:
+                raise ValueError("Use a minor-allele-frequency range between 0 and 0.5")
+            dataset.total_attribute_count = int(self.attr_count_var.get())
+            if dataset.total_attribute_count < predictive_count:
+                raise ValueError(f"Total number of attributes must be at least {predictive_count}")
+            if dataset.create_continuous_endpoints:
+                dataset.total_count = int(self.total_var.get())
+                dataset.case_proportion = None
+                dataset.continuous_endpoints_standard_deviation = float(self.std_var.get())
+            else:
+                cases = int(self.case_var.get())
+                controls = int(self.control_var.get())
+                if cases <= 0 or controls <= 0:
+                    raise ValueError("Case and control counts must be greater than zero")
+                dataset.total_count = cases + controls
+                dataset.case_proportion = cases / dataset.total_count
+
+        document.dataset_list = [dataset]
+        document.first_dataset = dataset
+        document.run_document = True
+        error = document.verify_all_needed_parameters()
+        if error is not None:
+            raise error
+        return document
+
+    def _on_generate(self) -> None:
+        if self._running:
+            return
+        try:
+            document = self._build_document()
+        except Exception as exc:
+            messagebox.showerror("Input error", str(exc), parent=self)
+            return
+        path = filedialog.asksaveasfilename(title="Location for generated datasets")
+        if not path:
+            return
+        document.first_dataset.output_file = Path(path)
+        self._running = True
+        self._run_kind = "dataset"
+        self._worker_done = False
+        self._worker_error = None
+        self._worker_model_result = None
+        self._show_progress("Saving datasets...")
+        self._refresh_model_table()
+        self._launch_worker(_dataset_generation_worker, document)
+
+    def _start_model_generation(self, specification: ModelSpec) -> None:
+        self._running = True
+        self._run_kind = "model"
+        self._worker_done = False
+        self._worker_error = None
+        self._worker_model_result = None
+        self._show_progress("Generating models...")
+        self._refresh_model_table()
+        self._launch_worker(_model_generation_worker, specification, None)
+
+    def _show_progress(self, label: str) -> None:
+        window = tk.Toplevel(self)
+        window.title("Progress")
+        window.transient(self)
+        window.resizable(False, False)
+        ttk.Label(window, text=label).pack(padx=20, pady=(12, 5))
+        bar = ttk.Progressbar(window, mode="indeterminate", length=260)
+        bar.pack(padx=20, pady=(0, 12))
+        bar.start(12)
+        window.protocol("WM_DELETE_WINDOW", lambda: None)
+        window.grab_set()
+        self._progress_window = window
+        self._progress_bar = bar
+        window.after_idle(lambda: _activate_window(window))
+
+    def _hide_progress(self) -> None:
+        if self._progress_bar is not None:
+            self._progress_bar.stop()
+        if self._progress_window is not None:
+            try:
+                self._progress_window.grab_release()
+                self._progress_window.destroy()
+            except Exception:
+                pass
+        self._progress_bar = None
+        self._progress_window = None
+
+    def _launch_worker(self, target: object, *arguments: object) -> None:
+        self._worker_queue = queue.Queue()
+        self._worker_thread = threading.Thread(
+            target=_responsive_worker_entry,
+            args=(target, self._worker_queue, *arguments),
+            daemon=True,
+        )
+        self._worker_thread.start()
+
+    def _poll_worker(self) -> None:
+        while True:
+            try:
+                message_type, payload = self._worker_queue.get_nowait()
+            except queue.Empty:
+                break
+            if message_type == "model":
+                self._worker_model_result = payload
+            elif message_type == "error":
+                self._worker_error = str(payload)
+            elif message_type == "done":
+                self._worker_done = True
+        if self._worker_thread is not None and not self._worker_thread.is_alive() and not self._worker_done:
+            self._worker_error = "Generation worker stopped unexpectedly"
+            self._worker_done = True
+        if self._running and self._worker_done:
+            self._finish_run()
+        self.after(50, self._poll_worker)
 
     def _finish_run(self) -> None:
         self._running = False
-        self.run_btn.state(["!disabled"])
+        self._worker_thread = None
+        self._hide_progress()
+        if self._worker_error:
+            messagebox.showerror("Error in processing", self._worker_error, parent=self)
+        elif self._run_kind == "model" and self._worker_model_result is not None:
+            model = self._worker_model_result
+            self.models.append(model)
+            if len(model.population_scores) < model.population_count:
+                messagebox.showwarning(
+                    "Warning",
+                    f"You asked for a population of {model.population_count} models, but only {len(model.population_scores)} were found.",
+                    parent=self,
+                )
+        self._worker_done = False
+        self._worker_model_result = None
+        self._refresh_model_table()
+
+    def _configuration_payload(self) -> Dict[str, object]:
+        model_items = []
+        for model in self.models:
+            if not model.input_path:
+                raise ValueError(f"Model {model.name} has not been saved")
+            model_items.append(
+                {
+                    "file": model.input_path,
+                    "weight": model.weight,
+                    "selected": model.selected,
+                }
+            )
+        return {
+            "format": "GAMETES Python GUI configuration",
+            "version": 1,
+            "models": model_items,
+            "dataset": {
+                "noise_mode": self.noise_mode_var.get(),
+                "noise_file": getattr(self, "noise_file_path", ""),
+                "total_attributes": self.attr_count_var.get(),
+                "maf_min": self.af_min_var.get(),
+                "maf_max": self.af_max_var.get(),
+                "endpoint": self.endpoint_var.get(),
+                "mixed": self.mixed_var.get(),
+                "heterogeneous_labels": self.hetero_label_var.get(),
+                "cases": self.case_var.get(),
+                "controls": self.control_var.get(),
+                "balanced": self.balanced_var.get(),
+                "file_case_percent": self.read_case_percent_var.get(),
+                "total_samples": self.total_var.get(),
+                "standard_deviation": self.std_var.get(),
+                "replicates": self.repl_var.get(),
+            },
+        }
+
+    def _save_configuration(self) -> None:
+        if self.configuration_file is None:
+            self._save_configuration_as()
+            return
+        self._write_configuration(self.configuration_file)
+
+    def _save_configuration_as(self) -> None:
+        path = filedialog.asksaveasfilename(
+            title="Save GAMETES configuration",
+            defaultextension=".json",
+            filetypes=[("GAMETES configuration", "*.json"), ("All files", "*")],
+        )
+        if path:
+            self.configuration_file = Path(path)
+            self._write_configuration(self.configuration_file)
+
+    def _write_configuration(self, path: Path) -> None:
+        try:
+            payload = self._configuration_payload()
+            path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except Exception as exc:
+            messagebox.showerror("Unable to save configuration", str(exc), parent=self)
+
+    def _open_configuration(self) -> None:
+        path = filedialog.askopenfilename(
+            title="Open GAMETES configuration",
+            filetypes=[("GAMETES configuration", "*.json"), ("All files", "*")],
+        )
+        if not path:
+            return
+        try:
+            config_path = Path(path)
+            payload = json.loads(config_path.read_text(encoding="utf-8"))
+            if payload.get("format") != "GAMETES Python GUI configuration":
+                raise ValueError("This is not a GAMETES Python GUI configuration")
+            models = []
+            for item in payload.get("models", []):
+                model_path = Path(item["file"])
+                if not model_path.is_absolute():
+                    model_path = config_path.parent / model_path
+                model = load_model_spec(model_path)
+                model.weight = float(item.get("weight", 1.0))
+                model.selected = bool(item.get("selected", False))
+                models.append(model)
+            standardize_selected_quantiles(models)
+            self.models = models
+            dataset = payload.get("dataset", {})
+            self.noise_mode_var.set(str(dataset.get("noise_mode", "generate")))
+            self.attr_count_var.set(str(dataset.get("total_attributes", "100")))
+            self.af_min_var.set(str(dataset.get("maf_min", "0.01")))
+            self.af_max_var.set(str(dataset.get("maf_max", "0.5")))
+            self.endpoint_var.set(str(dataset.get("endpoint", "binary")))
+            self.mixed_var.set(str(dataset.get("mixed", "hierarchical")))
+            self.hetero_label_var.set(bool(dataset.get("heterogeneous_labels", False)))
+            self.case_var.set(str(dataset.get("cases", "400")))
+            self.control_var.set(str(dataset.get("controls", "400")))
+            self.balanced_var.set(bool(dataset.get("balanced", False)))
+            self.read_case_percent_var.set(float(dataset.get("file_case_percent", 50.0)))
+            self.total_var.set(str(dataset.get("total_samples", "800")))
+            self.std_var.set(str(dataset.get("standard_deviation", "0.2")))
+            self.repl_var.set(str(dataset.get("replicates", "100")))
+            noise_file = str(dataset.get("noise_file", ""))
+            if noise_file:
+                noise_path = Path(noise_file)
+                if not noise_path.is_absolute():
+                    noise_path = config_path.parent / noise_path
+                self._load_noise_path(noise_path)
+            self.configuration_file = config_path
+            self._update_noise_mode()
+            self._update_endpoint_ui()
+            self._refresh_model_table()
+        except Exception as exc:
+            messagebox.showerror("Unable to open configuration", str(exc), parent=self)
+
+    def _load_noise_path(self, path: Path) -> None:
+        rows = SnpGenSimulator.parse_data_input_file(path)
+        if not rows:
+            raise ValueError("Noise SNP file is empty")
+        self.noise_file_path = str(path)
+        self.noise_file_attributes = len(rows[0])
+        self.noise_file_instances = len(rows)
+        self.noise_file_label.configure(text=f"File: {path.name}")
+        self.noise_attribute_label.configure(text=f"Number of attributes: {self.noise_file_attributes}")
+        self.noise_instance_label.configure(text=f"Total number of instances: {self.noise_file_instances}")
+
+    def _new_configuration(self) -> None:
+        if self.models and not messagebox.askyesno("New", "Clear all models and start a new configuration?", parent=self):
+            return
+        self.models = []
+        self.configuration_file = None
+        self.next_model_number = 1
+        self.noise_file_attributes = 0
+        self.noise_file_instances = 0
+        self.noise_file_path = ""
+        self.noise_mode_var.set("generate")
+        self.attr_count_var.set("100")
+        self.af_min_var.set("0.01")
+        self.af_max_var.set("0.5")
+        self.endpoint_var.set("binary")
+        self.mixed_var.set("hierarchical")
+        self.hetero_label_var.set(False)
+        self.case_var.set("400")
+        self.control_var.set("400")
+        self.balanced_var.set(False)
+        self.read_case_percent_var.set(50.0)
+        self.total_var.set("800")
+        self.std_var.set("0.2")
+        self.repl_var.set("100")
+        self.noise_file_label.configure(text="File: (none)")
+        self.noise_attribute_label.configure(text="Number of attributes: 0")
+        self.noise_instance_label.configure(text="Total number of instances: 0")
+        self._update_noise_mode()
+        self._update_endpoint_ui()
+        self._refresh_model_table()
+
+    def _close_application(self) -> None:
+        self.destroy()
 
 
 def launch_gui() -> None:

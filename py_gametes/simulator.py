@@ -7,6 +7,7 @@ from random import Random
 from typing import List, Optional, Sequence, TextIO
 
 from .document import DocDataset, DocModel, InputException, MixedModelDatasetType, SnpGenDocument
+from .java_random import JavaRandom
 from .penetrance_table import CellId, ErrorState, PenetranceCell, PenetranceTable
 
 
@@ -31,7 +32,9 @@ class SnpGenSimulator:
     TABLE_TOKEN = "Table:"
 
     def __init__(self) -> None:
-        self.random = Random()
+        # Java-compatible RNG semantics make a v2.2 seed portable between the
+        # original JAR and this Python implementation.
+        self.random = JavaRandom()
         self.penetrance_table_quantiles: Optional[List[PenetranceTableQuantile]] = None
         self.document: Optional[SnpGenDocument] = None
         self.table_population_count_found = 0
@@ -165,7 +168,7 @@ class SnpGenSimulator:
                     ):
                         instance_count = dd.total_count
                         case_prop = 0.0 if dd.case_proportion is None else dd.case_proportion
-                        case_count = int(round(case_prop * instance_count))
+                        case_count = math.floor((case_prop * instance_count) + 0.5)
                         self.add_model_label_to_het_output_case_control(dataset_file, self.document.model_fractions, case_count)
 
         if len(self.document.dataset_list) > 0:
@@ -280,6 +283,11 @@ class SnpGenSimulator:
     ) -> List[float]:
         if self.document is None:
             raise RuntimeError("Document is not set")
+
+        # Custom and loaded models already contain their selected quantile tables.
+        if model.penetrance_tables:
+            model.quantile_count_in_model = len(model.penetrance_tables)
+            return [table.get_quantile_score(model.get_use_odds_ratio()) for table in model.penetrance_tables]
 
         self.set_random_seed(self.document.random_seed)
 
@@ -633,7 +641,7 @@ class SnpGenSimulator:
                 for t in tables:
                     t.clear()
 
-                case_count = int(round((dd.case_proportion or 0.0) * instance_count))
+                case_count = math.floor(((dd.case_proportion or 0.0) * instance_count) + 0.5)
                 control_count = instance_count - case_count
 
                 cls.print_instances(
@@ -1085,6 +1093,9 @@ class SnpGenSimulator:
                 which_cell += 1
 
         table.calc_and_set_heritability()
+        table.calc_and_set_edm()
+        table.calc_and_set_odds_ratio()
+        table.check_row_sums()
 
     @staticmethod
     def _format_ten_decimals(value: float) -> str:

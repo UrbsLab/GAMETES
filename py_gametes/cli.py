@@ -34,8 +34,9 @@ def run_document(doc: SnpGenDocument) -> None:
 def main(argv: Optional[List[str]] = None) -> int:
     args = sys.argv[1:] if argv is None else argv
 
-    # Python GUI mode (roughly aligned with the Java JAR workflow).
-    if "--gui" in args:
+    # The v2.2 JAR opens its desktop UI when invoked without arguments.
+    # ``--gui`` is also accepted as an explicit Python convenience.
+    if not args or "--gui" in args:
         args = [a for a in args if a != "--gui"]
         if args:
             print("`--gui` cannot be combined with other CLI arguments.", file=sys.stderr)
@@ -58,8 +59,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         traceback.print_exc()
         return 1
 
-    if show_gui:
-        print("No arguments provided. Use `--gui` for the desktop interface or `--help` for CLI options.")
+    if show_gui:  # Defensive: the no-argument case is handled above.
         return 0
 
     if doc.run_document:

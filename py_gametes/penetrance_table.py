@@ -205,6 +205,8 @@ class PenetranceTable:
             diff = self.cells[i].value - self.prevalence
             out_sum += prob * prob * diff * diff
         k_prod = self.prevalence * (1.0 - self.prevalence)
+        if abs(k_prod) < 1e-15:
+            return math.nan
         return out_sum / (2.0 * k_prod * k_prod)
 
     def calc_heritability(self) -> float:
@@ -216,7 +218,10 @@ class PenetranceTable:
             prob = self.get_probability_product(cell_id)
             diff = self.cells[i].value - self.prevalence
             out_sum += prob * diff * diff
-        return out_sum / (self.prevalence * (1.0 - self.prevalence))
+        denominator = self.prevalence * (1.0 - self.prevalence)
+        if abs(denominator) < 1e-15:
+            return math.nan
+        return out_sum / denominator
 
     def calc_odds_ratio(self) -> float:
         self.calc_and_set_prevalence()
@@ -237,7 +242,31 @@ class PenetranceTable:
                 sum_tn += prob * (1.0 - prev)
                 sum_fn += prob * prev
 
-        return (sum_tp * sum_tn) / (sum_fn * sum_fp)
+        numerator = sum_tp * sum_tn
+        denominator = sum_fn * sum_fp
+        if abs(denominator) < 1e-15:
+            return math.inf if numerator > 0.0 else math.nan
+        return numerator / denominator
+
+    def calc_marginal_prevalences(self) -> List[List[float]]:
+        """Return P(disease | genotype) for each attribute and genotype state."""
+        numerators = [[0.0 for _ in range(self.snp_state_count)] for _ in range(self.attribute_count)]
+        cell_id = CellId(self.attribute_count)
+
+        for master_index, cell in enumerate(self.cells):
+            self.master_index_to_cell_id(master_index, cell_id)
+            for fixed_dimension in range(self.attribute_count):
+                state = cell_id.get_index(fixed_dimension)
+                numerators[fixed_dimension][state] += self.get_probability_product(cell_id) * cell.value
+
+        marginals: List[List[float]] = []
+        for dimension, values in enumerate(numerators):
+            dimension_values = []
+            for state, numerator in enumerate(values):
+                frequency = self.state_probability[dimension][state]
+                dimension_values.append(numerator / frequency if frequency != 0.0 else math.nan)
+            marginals.append(dimension_values)
+        return marginals
 
     def calc_sampling_intervals(self) -> None:
         cell_id = CellId(self.attribute_count)
@@ -308,8 +337,12 @@ class PenetranceTable:
             self.master_index_to_cell_id(rng.randrange(self.cell_count), self.blocked_out_cell_for_point_method)
             self.next_master_cell_id_for_point_method = 0
 
-        # Mirrors Java behavior where the current RNG is reseeded from its next long.
-        rng.seed(rng.getrandbits(64))
+        # Mirrors Java behavior where the current RNG is reseeded from its
+        # signed nextLong value.
+        if hasattr(rng, "next_long"):
+            rng.seed(rng.next_long())
+        else:
+            rng.seed(rng.getrandbits(64))
 
         cell_id = CellId(self.attribute_count)
         while self._empty_cell_remaining():
@@ -476,7 +509,6 @@ class PenetranceTable:
             if append:
                 f.write("\n\n\n\n")
             f.write(self.write_with_stats(save_unnormalized))
-            f.write("\n")
 
     def _all_values_set_in_row(self, cell_id: CellId, which_dimension: int) -> bool:
         return self._count_filled_cells(cell_id, which_dimension, None) == self.snp_state_count

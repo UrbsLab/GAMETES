@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import shlex
 from dataclasses import dataclass, field
 from enum import Enum
@@ -36,7 +37,7 @@ class DocDataset:
     heterogeneous_label_boolean: bool = False
 
     def get_case_count(self) -> int:
-        return int(round((self.case_proportion or 0.0) * self.total_count))
+        return math.floor(((self.case_proportion or 0.0) * self.total_count) + 0.5)
 
     def get_control_count(self) -> int:
         return self.total_count - self.get_case_count()
@@ -385,17 +386,34 @@ class SnpGenDocument:
     def print_option_help() -> None:
         print(
             "Usage: python -m py_gametes <program arguments>\n"
-            "If there are no arguments, CLI mode requires arguments to run. Complete list of program arguments:\n\n"
-            "{-M,--model} Command to generate model(s) with specified model constraints\n"
-            "{-D,--dataset} Command to generate dataset(s) with specified dataset constraints.\n"
-            "{-i,--modelInputFile} Input model file(s)\n"
-            "{-w,--modelWeight} Relative model weight(s)\n"
-            "{-v,--predictiveInputFile} Predictive data input file\n"
-            "{-z,--noiseInputFile} Noise data input file\n"
-            "{-q,--rasQuantileCount} Number of quantiles\n"
-            "{-p,--rasPopulationCount} Number of candidate models\n"
-            "{-t,--rasTryCount} Number of generation attempts\n"
-            "{-r,--randomSeed} Random seed\n"
+            "If there are no arguments, the desktop interface is opened.\n\n"
+            "{-M,--model} Quoted model constraint string (repeatable)\n"
+            "    {-h,--heritability} double\n"
+            "    {-p,--caseProportion} double\n"
+            "    {-d,--useOddsRatio} flag\n"
+            "    {-a,--attributeAlleleFrequency} double (repeatable)\n"
+            "    {-o,--modelOutputFile} string\n"
+            "{-D,--dataset} Quoted dataset constraint string (repeatable)\n"
+            "    {-n,--alleleFrequencyMin} double (default: 0.01)\n"
+            "    {-x,--alleleFrequencyMax} double (default: 0.5)\n"
+            "    {-a,--totalAttributeCount} integer (default: 100)\n"
+            "    {-t,--totalCount} integer, continuous data (default: 800)\n"
+            "    {-s,--caseCount} integer, binary data (default: 400)\n"
+            "    {-w,--controlCount} integer, binary data (default: 400)\n"
+            "    {-r,--replicateCount} integer (default: 100)\n"
+            "    {-o,--datasetOutputFile} string\n"
+            "    {-c,--continuous} flag\n"
+            "    {-h,--mixedModelDatasetType} heterogeneous|hierarchical\n"
+            "    {-b,--heteroLabel} flag\n"
+            "    {-d,--standardDeviation} double (default: 0.2)\n"
+            "{-i,--modelInputFile} string (repeatable)\n"
+            "{-w,--modelWeight} double (repeat once per model)\n"
+            "{-v,--predictiveInputFile} string\n"
+            "{-z,--noiseInputFile} string\n"
+            "{-q,--rasQuantileCount} integer (default: 3)\n"
+            "{-p,--rasPopulationCount} integer (default: 1000)\n"
+            "{-t,--rasTryCount} integer (default: 100000)\n"
+            "{-r,--randomSeed} integer\n"
             "{-h,--help} Show this help"
         )
 
