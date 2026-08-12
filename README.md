@@ -40,17 +40,48 @@ The Tkinter UI reproduces the Swing application's controls and workflows.
 Native widgets are rendered by the operating system, so it is behaviorally—not
 pixel—identical to Swing.
 
-## Install
+## Install from GitHub
 
 Python 3.9 or newer is required.
 
+Install the `dev` branch directly from GitHub in one step:
+
 ```bash
-cd gametes-python
-python3 -m venv .venv
-.venv/bin/pip install -e '.[test]'
+python3 -m pip install "git+https://github.com/UrbsLab/GAMETES.git@dev"
+gametes
 ```
 
-Tkinter ships with many Python installations. Verify it with:
+This installs a normal copy and does not leave a source checkout. To work on
+the code, clone the branch and use an editable install instead:
+
+```bash
+git clone --branch dev https://github.com/UrbsLab/GAMETES.git
+cd GAMETES
+python3 -m pip install -e .
+gametes
+```
+
+The project has no third-party runtime dependencies. A virtual environment is
+therefore optional, although it remains useful for development or when the
+Python installation does not permit global package changes. If `pip` reports
+an `externally-managed-environment` or a permissions error, `pipx` is the best
+way to expose the `gametes` command globally while keeping it isolated:
+
+```bash
+pipx install "git+https://github.com/UrbsLab/GAMETES.git@dev"
+gametes
+```
+
+For development with an optional virtual environment and the test dependency:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[test]"
+```
+
+Tkinter is supplied by the Python installation rather than `pip`. Verify it
+with:
 
 ```bash
 python3 -m tkinter
@@ -67,14 +98,14 @@ brew install python-tk@3.13
 Like the JAR, running GAMETES with no arguments opens the UI:
 
 ```bash
-.venv/bin/gametes
+gametes
 ```
 
 These are equivalent:
 
 ```bash
-.venv/bin/gametes --gui
-.venv/bin/python -m py_gametes --gui
+gametes --gui
+python3 -m py_gametes --gui
 ```
 
 The GUI supports generated models, direct 2-locus and 3-locus penetrance-table
@@ -87,7 +118,7 @@ noise files, replicates, and JSON session save/open.
 The Python command keeps the JAR's nested quoted `-M` and `-D` arguments:
 
 ```bash
-.venv/bin/gametes \
+gametes \
   -M "-h 0.2 -p 0.3 -a 0.3 -a 0.2 -o basicModel" \
   -q 1 \
   -p 30 \
@@ -189,8 +220,11 @@ gametes \
 
 ## Test
 
+Install the test extra from an editable source checkout, then run the suite:
+
 ```bash
-.venv/bin/pytest -q
+python3 -m pip install -e ".[test]"
+python3 -m pytest -q
 ```
 
 Set `GAMETES_JAR=/path/to/gametes_2.2_dev.jar` to enable optional cross-runtime

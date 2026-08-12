@@ -1,8 +1,23 @@
+# Operating-system and editor files
 .DS_Store
-.idea
+.idea/
 .ipynb_checkpoints/
-*.pyc
-__pycache__
-.pytest_cache
+
+# Python bytecode and test caches
+__pycache__/
+*.py[codz]
+.pytest_cache/
+
+# Local virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Packaging artifacts
+*.egg-info/
+build/
+dist/
+
+# Java reference/decompilation artifacts
 *.java
-.DS_Store
