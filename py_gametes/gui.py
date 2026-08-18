@@ -49,6 +49,7 @@ TEXT = "#171717"
 MUTED = "#5f5f5f"
 INCOMPATIBLE = "#dedede"
 GRID = "#8a8a8a"
+FOCUS = "#2675d8"
 HIGH_ORDER_WARNING_THRESHOLD = 8
 ATTRIBUTE_COUNT_SPINBOX_MAX = 2_147_483_647
 
@@ -85,6 +86,26 @@ def penetrance_cell_count(attribute_count: int) -> int:
     if attribute_count < 1:
         raise ValueError("Attribute count must be positive")
     return 3**attribute_count
+
+
+def parse_model_heritability(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError:
+        raise ValueError("Heritability must be a decimal greater than 0 and at most 1 (for example, 0.2)") from None
+    if not math.isfinite(parsed) or not 0.0 < parsed <= 1.0:
+        raise ValueError("Heritability must be greater than 0 and at most 1 (for example, 0.2)")
+    return parsed
+
+
+def parse_model_prevalence(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError:
+        raise ValueError("Prevalence must be a decimal greater than 0 and less than 1 (for example, 0.5)") from None
+    if not math.isfinite(parsed) or not 0.0 < parsed < 1.0:
+        raise ValueError("Prevalence must be greater than 0 and less than 1; values of 0 and 1 are not valid")
+    return parsed
 
 
 def normalized_model_weights(models: Sequence["ModelSpec"]) -> List[float]:
@@ -188,11 +209,48 @@ def build_custom_table(
     return table
 
 
-def _activate_window(window: object) -> None:
+def _focus_editable_widget(event: object) -> None:
+    try:
+        event.widget.focus_force()
+    except Exception:
+        pass
+
+
+def _make_text_entry(parent: object, textvariable: object, width: int, justify: str = "left") -> object:
+    entry = tk.Entry(
+        parent,
+        textvariable=textvariable,
+        width=width,
+        justify=justify,
+        background=FIELD,
+        foreground=TEXT,
+        disabledbackground="#e1e1e1",
+        disabledforeground=MUTED,
+        insertbackground=FOCUS,
+        insertwidth=2,
+        insertontime=600,
+        insertofftime=300,
+        selectbackground=FOCUS,
+        selectforeground="#ffffff",
+        relief="solid",
+        borderwidth=1,
+        highlightthickness=2,
+        highlightbackground=GRID,
+        highlightcolor=FOCUS,
+        takefocus=True,
+    )
+    entry.bind("<Button-1>", _focus_editable_widget, add="+")
+    return entry
+
+
+def _activate_window(window: object, focus_widget: Optional[object] = None) -> None:
     try:
         window.update_idletasks()
         window.lift()
         window.focus_force()
+        if focus_widget is not None:
+            focus_widget.focus_force()
+            focus_widget.icursor("end")
     except Exception:
         pass
 
@@ -410,23 +468,27 @@ class GenerateModelDialog(_TkTopLevelBase):
         top = ttk.Frame(parameters)
         top.pack(fill="x", pady=(0, 5))
         ttk.Label(top, text="Number of attributes").pack(side="left")
-        ttk.Spinbox(
+        self.attribute_count_entry = ttk.Spinbox(
             top,
             from_=1,
             to=ATTRIBUTE_COUNT_SPINBOX_MAX,
             increment=1,
             width=5,
             textvariable=self.attribute_count_var,
-        ).pack(side="left", padx=(6, 30))
-        ttk.Label(top, text="Heritability").pack(side="left")
-        ttk.Entry(top, textvariable=self.heritability_var, width=8).pack(side="left", padx=(6, 30))
+            takefocus=True,
+        )
+        self.attribute_count_entry.pack(side="left", padx=(6, 24))
+        self.attribute_count_entry.bind("<Button-1>", _focus_editable_widget, add="+")
+        ttk.Label(top, text="Heritability (0 < h² ≤ 1)").pack(side="left")
+        self.heritability_entry = _make_text_entry(top, self.heritability_var, 8)
+        self.heritability_entry.pack(side="left", padx=(6, 24))
         ttk.Checkbutton(
             top,
             variable=self.prevalence_enabled_var,
             command=self._toggle_prevalence,
         ).pack(side="left")
-        ttk.Label(top, text="Prevalence").pack(side="left", padx=(4, 6))
-        self.prevalence_entry = ttk.Entry(top, textvariable=self.prevalence_var, width=8)
+        ttk.Label(top, text="Prevalence (0 < K < 1)").pack(side="left", padx=(4, 6))
+        self.prevalence_entry = _make_text_entry(top, self.prevalence_var, 8)
         self.prevalence_entry.pack(side="left")
 
         quantiles = ttk.Frame(parameters)
@@ -435,9 +497,11 @@ class GenerateModelDialog(_TkTopLevelBase):
         ttk.Radiobutton(quantiles, text="EDM", value="edm", variable=self.metric_var).pack(side="left", padx=(6, 4))
         ttk.Radiobutton(quantiles, text="Odds ratio", value="odds", variable=self.metric_var).pack(side="left", padx=(0, 16))
         ttk.Label(quantiles, text="Quantile count").pack(side="left")
-        ttk.Entry(quantiles, textvariable=self.quantile_count_var, width=10).pack(side="left", padx=(6, 20))
+        self.quantile_count_entry = _make_text_entry(quantiles, self.quantile_count_var, 10)
+        self.quantile_count_entry.pack(side="left", padx=(6, 20))
         ttk.Label(quantiles, text="Quantile population size").pack(side="left")
-        ttk.Entry(quantiles, textvariable=self.population_count_var, width=10).pack(side="left", padx=(6, 0))
+        self.population_count_entry = _make_text_entry(quantiles, self.population_count_var, 10)
+        self.population_count_entry.pack(side="left", padx=(6, 0))
 
         table_outer = tk.Frame(body, background=GRID, padx=1, pady=1)
         table_outer.pack(fill="both", expand=True)
@@ -486,7 +550,7 @@ class GenerateModelDialog(_TkTopLevelBase):
         self.bind("<Escape>", lambda _event: self._cancel())
         self.protocol("WM_DELETE_WINDOW", self._cancel)
         self.grab_set()
-        self.after_idle(lambda: _activate_window(self))
+        self.after_idle(lambda: _activate_window(self, self.attribute_count_entry))
 
     def _attribute_count_changed(self, *_args: object) -> None:
         try:
@@ -537,33 +601,16 @@ class GenerateModelDialog(_TkTopLevelBase):
                 maf_var = tk.StringVar(value=maf)
                 self.name_vars.append(name_var)
                 self.maf_vars.append(maf_var)
-                tk.Entry(
-                    self.attribute_table,
-                    textvariable=name_var,
-                    relief="solid",
-                    borderwidth=1,
-                    background=FIELD,
-                    foreground=TEXT,
-                    insertbackground=TEXT,
-                ).grid(
-                    row=index + 1, column=0, sticky="nsew"
-                )
-                tk.Entry(
-                    self.attribute_table,
-                    textvariable=maf_var,
-                    relief="solid",
-                    borderwidth=1,
-                    background=FIELD,
-                    foreground=TEXT,
-                    insertbackground=TEXT,
-                ).grid(
-                    row=index + 1, column=1, sticky="nsew"
-                )
+                _make_text_entry(self.attribute_table, name_var, 20).grid(row=index + 1, column=0, sticky="nsew")
+                _make_text_entry(self.attribute_table, maf_var, 20).grid(row=index + 1, column=1, sticky="nsew")
         finally:
             self._syncing_rows = False
 
     def _toggle_prevalence(self) -> None:
-        self.prevalence_entry.state(["!disabled"] if self.prevalence_enabled_var.get() else ["disabled"])
+        self.prevalence_entry.configure(state="normal" if self.prevalence_enabled_var.get() else "disabled")
+        if self.prevalence_enabled_var.get():
+            self.prevalence_entry.focus_force()
+            self.prevalence_entry.icursor("end")
 
     def _save(self) -> None:
         assert messagebox is not None
@@ -571,14 +618,10 @@ class GenerateModelDialog(_TkTopLevelBase):
             count = int(self.attribute_count_var.get())
             if count != len(self.name_vars):
                 raise ValueError("Number of attributes is invalid")
-            heritability = float(self.heritability_var.get())
-            if not 0.0 < heritability <= 1.0:
-                raise ValueError("Heritability must be greater than 0 and at most 1")
+            heritability = parse_model_heritability(self.heritability_var.get())
             prevalence = None
             if self.prevalence_enabled_var.get():
-                prevalence = float(self.prevalence_var.get())
-                if not 0.0 < prevalence < 1.0:
-                    raise ValueError("Prevalence must be between 0 and 1")
+                prevalence = parse_model_prevalence(self.prevalence_var.get())
             names = [variable.get().strip() for variable in self.name_vars]
             if any(not name for name in names) or len(set(names)) != len(names):
                 raise ValueError("SNP names must be non-empty and unique")
@@ -644,6 +687,7 @@ class CustomModelDialog(_TkTopLevelBase):
         initial_values = [cell.value for cell in model.tables[0].cells] if model.tables else [0.0] * (3**model.order)
         self._preserved_values = list(initial_values)
         self.cell_vars: List[tk.StringVar] = []
+        self._stats_refresh_job: Optional[str] = None
         self.property_vars: Dict[str, tk.StringVar] = {
             "heritability": tk.StringVar(value="-"),
             "prevalence": tk.StringVar(value="-"),
@@ -651,6 +695,8 @@ class CustomModelDialog(_TkTopLevelBase):
             "odds": tk.StringVar(value="-"),
         }
         self.marginal_var = tk.StringVar(value="")
+        for variable in self.maf_vars:
+            variable.trace_add("write", self._schedule_stats_refresh)
 
         body = ttk.Frame(self, padding=7)
         body.pack(fill="both", expand=True)
@@ -659,6 +705,11 @@ class CustomModelDialog(_TkTopLevelBase):
         ttk.Label(header, text="Model Order:").pack(side="left")
         ttk.Radiobutton(header, text="2-locus", value=2, variable=self.order_var, command=self._change_order).pack(side="left", padx=(5, 0))
         ttk.Radiobutton(header, text="3-locus", value=3, variable=self.order_var, command=self._change_order).pack(side="left", padx=(5, 0))
+        ttk.Label(
+            body,
+            text="Enter decimal penetrances from 0 to 1. Calculated properties update as you type.",
+            foreground=MUTED,
+        ).pack(pady=(5, 0))
 
         content = ttk.Frame(body)
         content.pack(fill="both", expand=True, pady=(7, 0))
@@ -677,7 +728,7 @@ class CustomModelDialog(_TkTopLevelBase):
         properties = ttk.Frame(side, padding=10, relief="solid")
         properties.pack(fill="x", pady=(15, 0))
         for row, (key, label) in enumerate(
-            (("heritability", "Heritability:"), ("prevalence", "Prevalence:"), ("edm", "EDM:"), ("odds", "COR:"))
+            (("heritability", "Heritability (calculated):"), ("prevalence", "Prevalence (calculated):"), ("edm", "EDM:"), ("odds", "COR:"))
         ):
             ttk.Label(properties, text=label).grid(row=row, column=0, sticky="e", pady=3)
             ttk.Label(properties, textvariable=self.property_vars[key], font=("TkDefaultFont", 10, "bold")).grid(
@@ -702,7 +753,7 @@ class CustomModelDialog(_TkTopLevelBase):
         self.bind("<Escape>", lambda _event: self._cancel())
         self.protocol("WM_DELETE_WINDOW", self._cancel)
         self.grab_set()
-        self.after_idle(lambda: _activate_window(self))
+        self.after_idle(lambda: _activate_window(self, self.first_cell_entry))
 
     def _change_order(self) -> None:
         self._preserved_values = self._current_values(fallback=True)
@@ -716,6 +767,7 @@ class CustomModelDialog(_TkTopLevelBase):
 
         order = self.order_var.get()
         self.cell_vars = []
+        self.first_cell_entry = None
         panels = 3 if order == 3 else 1
         for panel_index in range(panels):
             panel = ttk.Frame(self.table_host)
@@ -735,17 +787,30 @@ class CustomModelDialog(_TkTopLevelBase):
                     value = values[index] if index < len(values) else 0.0
                     variable = tk.StringVar(value=f"{float(value):.7g}")
                     self.cell_vars.append(variable)
-                    entry = ttk.Entry(panel, textvariable=variable, width=7)
+                    variable.trace_add("write", self._schedule_stats_refresh)
+                    entry = _make_text_entry(panel, variable, 7, justify="center")
                     entry.grid(row=row + 2, column=column + 2, padx=2, pady=2)
-                    entry.bind("<FocusOut>", self._refresh_stats)
                     entry.bind("<Return>", self._refresh_stats)
+                    if self.first_cell_entry is None:
+                        self.first_cell_entry = entry
 
         for index in range(order):
             ttk.Label(self.maf_rows, text=f"MAF {self.feature_names[index]}:").grid(row=index, column=0, sticky="e", pady=3)
-            entry = ttk.Entry(self.maf_rows, textvariable=self.maf_vars[index], width=8)
+            entry = _make_text_entry(self.maf_rows, self.maf_vars[index], 8)
             entry.grid(row=index, column=1, sticky="w", padx=(7, 0), pady=3)
-            entry.bind("<FocusOut>", self._refresh_stats)
             entry.bind("<Return>", self._refresh_stats)
+        self._refresh_stats()
+
+    def _schedule_stats_refresh(self, *_args: object) -> None:
+        if self._stats_refresh_job is not None:
+            try:
+                self.after_cancel(self._stats_refresh_job)
+            except Exception:
+                pass
+        self._stats_refresh_job = self.after(60, self._run_scheduled_stats_refresh)
+
+    def _run_scheduled_stats_refresh(self) -> None:
+        self._stats_refresh_job = None
         self._refresh_stats()
 
     def _current_values(self, fallback: bool = False) -> List[float]:

@@ -25,6 +25,8 @@ from py_gametes.gui import (
     model_tables_path,
     normalize_model_output_prefix,
     normalized_model_weights,
+    parse_model_heritability,
+    parse_model_prevalence,
     penetrance_cell_count,
     save_model_spec,
     selected_model_can_be_edited,
@@ -86,6 +88,19 @@ def test_penetrance_cell_count_has_no_eight_attribute_cap() -> None:
     assert penetrance_cell_count(12) == 531_441
     with pytest.raises(ValueError, match="positive"):
         penetrance_cell_count(0)
+
+
+def test_model_probability_inputs_explain_valid_decimal_ranges() -> None:
+    assert parse_model_heritability("0.2") == 0.2
+    assert parse_model_heritability("1") == 1.0
+    assert parse_model_prevalence("0.5") == 0.5
+
+    with pytest.raises(ValueError, match="at most 1"):
+        parse_model_heritability("20")
+    with pytest.raises(ValueError, match="less than 1"):
+        parse_model_prevalence("1")
+    with pytest.raises(ValueError, match="decimal"):
+        parse_model_prevalence("50%")
 
 
 def test_java_random_matches_java_util_random_reference_sequence() -> None:
